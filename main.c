@@ -45,6 +45,17 @@ SDL_AppResult shutdown() {
 	return SDL_APP_SUCCESS;
 }
 
+SDL_AppResult load_world() {
+	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	for (int row = 0; row < WINDOW_HEIGHT; row++) {
+		for (int column = 0; column < WINDOW_WIDTH; column++) {
+			framebuffer[row * WINDOW_WIDTH + column] = SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200);
+		}
+	}
+
+	return SDL_APP_CONTINUE;
+}
+
 SDL_AppResult handle_input() {
 	SDL_Event event;
 
@@ -54,6 +65,10 @@ SDL_AppResult handle_input() {
 			return SDL_APP_SUCCESS;
 
 		// TODO: Add events
+		case SDL_EVENT_MOUSE_MOTION:
+			if (event.motion.state == SDL_BUTTON_LEFT)
+				framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] =
+				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);
 		}
 	}
 
@@ -62,13 +77,6 @@ SDL_AppResult handle_input() {
 
 
 SDL_AppResult render() {
-	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
-	for (int row = 0; row < WINDOW_HEIGHT; row++) {
-		for (int column = 0; column < WINDOW_WIDTH; column++) {
-			framebuffer[row * WINDOW_WIDTH + column] = SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200);
-		}
-	}
-
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 
 	SDL_RenderClear(renderer);
@@ -86,6 +94,8 @@ void main() {
 	int engine_status = SDL_APP_CONTINUE;
 
 	engine_status = initialize();
+	if (engine_status == SDL_APP_CONTINUE)
+		engine_status = load_world();
 
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {
