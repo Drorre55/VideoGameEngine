@@ -10,7 +10,6 @@ static SDL_Renderer* renderer = NULL;
 
 static uint32_t* framebuffer;
 
-
 SDL_AppResult initialize() {
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
@@ -61,9 +60,14 @@ SDL_AppResult handle_input() {
 	return SDL_APP_CONTINUE;
 }
 
+
 SDL_AppResult render() {
-	// TODO: Fix colors
-	memset(framebuffer, SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200), WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	for (int row = 0; row < WINDOW_HEIGHT; row++) {
+		for (int column = 0; column < WINDOW_WIDTH; column++) {
+			framebuffer[row * WINDOW_WIDTH + column] = SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200);
+		}
+	}
 
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 
