@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include "SDL3/SDL.h"
+#include "engine.h"
+
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
@@ -9,6 +11,8 @@ static SDL_Texture* texture = NULL;
 static SDL_Renderer* renderer = NULL;
 
 static uint32_t* framebuffer;
+static WorldObjects* worldObjects;
+static Camera* camera;
 
 SDL_AppResult initialize() {
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -53,6 +57,9 @@ SDL_AppResult load_world() {
 		}
 	}
 
+	worldObjects = load_world_objects();
+	camera = load_camera(WINDOW_WIDTH, WINDOW_HEIGHT);
+
 	return SDL_APP_CONTINUE;
 }
 
@@ -65,6 +72,11 @@ SDL_AppResult handle_input() {
 			return SDL_APP_SUCCESS;
 
 		// TODO: Add events
+		case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			SDL_Log("mouse down on pixel: (%d, %d)", (int)event.button.y, (int)event.button.x);
+			framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] = 
+				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);
+		
 		case SDL_EVENT_MOUSE_MOTION:
 			if (event.motion.state == SDL_BUTTON_LEFT)
 				framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] =
@@ -77,6 +89,9 @@ SDL_AppResult handle_input() {
 
 
 SDL_AppResult render() {
+	WorldObjects* on_screen_objects = get_on_screen_objects(worldObjects, camera);
+	rasterize_objects_to_frame(framebuffer, WINDOW_WIDTH, on_screen_objects);
+
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 
 	SDL_RenderClear(renderer);
