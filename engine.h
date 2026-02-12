@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+#define _USE_MATH_DEFINES
+#define FOV_CHOSEN 90
 
 typedef struct {
 	float x_coord;
@@ -22,12 +24,6 @@ typedef struct {
 	Point* corner3;
 } Triangle;
 
-typedef enum {
-	type_point,
-	type_box,
-	type_triangle
-} ObjectType;
-
 typedef struct {
 	Point** point_objects;
 	unsigned int num_points;
@@ -44,8 +40,8 @@ typedef struct {
 
 typedef struct {
 	Point* global_coords;
-	float x_direction;
-	float y_direction;
+	float x_direction_vector[2];
+	float y_direction_vector[2];
 	FOV* field_of_view;
 } Camera;
 

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "SDL3/SDL.h"
+#include "main.h"
 #include "engine.h"
+#include "graphics_pipeline.h"
 
 
 #define WINDOW_WIDTH 800
@@ -74,13 +76,16 @@ SDL_AppResult handle_input() {
 		// TODO: Add events
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			SDL_Log("mouse down on pixel: (%d, %d)", (int)event.button.y, (int)event.button.x);
-			framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] = 
-				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);
+			/*framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] = 
+				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);*/
 		
 		case SDL_EVENT_MOUSE_MOTION:
-			if (event.motion.state == SDL_BUTTON_LEFT)
-				framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] =
-				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);
+			if (event.motion.state == SDL_BUTTON_LEFT) {
+				/*framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] =
+				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);*/
+				move_camera_direction(camera, event.motion.xrel, event.motion.yrel, WINDOW_WIDTH, WINDOW_HEIGHT);
+				SDL_Log("moved camera x,y to - (%f, %f), %f", camera->x_direction_vector[0], camera->y_direction_vector[0], event.motion.yrel);
+			}
 		}
 	}
 
