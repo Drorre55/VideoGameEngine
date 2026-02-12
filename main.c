@@ -52,13 +52,6 @@ SDL_AppResult shutdown() {
 }
 
 SDL_AppResult load_world() {
-	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
-	for (int row = 0; row < WINDOW_HEIGHT; row++) {
-		for (int column = 0; column < WINDOW_WIDTH; column++) {
-			framebuffer[row * WINDOW_WIDTH + column] = SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200);
-		}
-	}
-
 	worldObjects = load_world_objects();
 	camera = load_camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -76,15 +69,11 @@ SDL_AppResult handle_input() {
 		// TODO: Add events
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			SDL_Log("mouse down on pixel: (%d, %d)", (int)event.button.y, (int)event.button.x);
-			/*framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] = 
-				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);*/
 		
 		case SDL_EVENT_MOUSE_MOTION:
 			if (event.motion.state == SDL_BUTTON_LEFT) {
-				/*framebuffer[(int)event.button.y * WINDOW_WIDTH + (int)event.button.x] =
-				SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 255, 255, 255, 255);*/
 				move_camera_direction(camera, event.motion.xrel, event.motion.yrel, WINDOW_WIDTH, WINDOW_HEIGHT);
-				SDL_Log("moved camera x,y to - (%f, %f), %f", camera->x_direction_vector[0], camera->y_direction_vector[0], event.motion.yrel);
+				//SDL_Log("moved camera x,y to - (%f, %f), %f", camera->x_direction_vector[0], camera->y_direction_vector[0], event.motion.yrel);
 			}
 		}
 	}
@@ -94,8 +83,15 @@ SDL_AppResult handle_input() {
 
 
 SDL_AppResult render() {
-	WorldObjects* on_screen_objects = get_on_screen_objects(worldObjects, camera);
-	rasterize_objects_to_frame(framebuffer, WINDOW_WIDTH, on_screen_objects);
+	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	for (int row = 0; row < WINDOW_HEIGHT; row++) {
+		for (int column = 0; column < WINDOW_WIDTH; column++) {
+			framebuffer[row * WINDOW_WIDTH + column] = SDL_MapRGBA(SDL_GetPixelFormatDetails(texture->format), NULL, 0, 0, 255, 200);
+		}
+	}
+
+	WorldObjects* on_screen_objects = get_on_screen_objects(worldObjects, camera, WINDOW_WIDTH);
+	rasterize_objects_to_frame(framebuffer, camera, WINDOW_WIDTH, WINDOW_HEIGHT, on_screen_objects);
 
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 

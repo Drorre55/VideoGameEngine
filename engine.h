@@ -47,6 +47,6 @@ typedef struct {
 
 Camera* load_camera(unsigned int window_width, unsigned int window_height);
 WorldObjects* load_world_objects();
-WorldObjects* get_on_screen_objects(WorldObjects* world_objects, Camera* camera);
-void rasterize_objects_to_frame(uint32_t* frame, unsigned int frame_width, WorldObjects* on_screen_objects);
+WorldObjects* get_on_screen_objects(WorldObjects* world_objects, Camera* camera, unsigned int window_width);
+void rasterize_objects_to_frame(uint32_t* frame, Camera* camera, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects);
 
