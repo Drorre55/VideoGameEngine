@@ -90,8 +90,7 @@ SDL_AppResult render() {
 		}
 	}
 
-	WorldObjects* on_screen_objects = get_on_screen_objects(worldObjects, camera, WINDOW_WIDTH);
-	rasterize_objects_to_frame(framebuffer, camera, WINDOW_WIDTH, WINDOW_HEIGHT, on_screen_objects);
+	run_graphics_pipeline(framebuffer, worldObjects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 

@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\Render Pipeline">
+      <UniqueIdentifier>{7e006612-25fc-4a40-b9b2-e05c1bcefaf8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Render Pipeline">
+      <UniqueIdentifier>{af2fe350-8d3c-4a9f-83e6-7dcbed38fefd}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -22,18 +28,42 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="graphics_pipeline.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Render Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="camera_space_transform.c">
+      <Filter>Source Files\Render Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="transformation_utils.c">
+      <Filter>Source Files\Render Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="scale_to_FOV_transform.c">
+      <Filter>Source Files\Render Pipeline</Filter>
+    </ClCompile>
+    <ClCompile Include="rasterizer.c">
+      <Filter>Source Files\Render Pipeline</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="engine.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="graphics_pipeline.h">
+    <ClInclude Include="engine.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics_pipeline.h">
+      <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="transformation_utils.h">
+      <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="camera_space_transform.h">
+      <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="scale_to_FOV_transform.h">
+      <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="rasterizer.h">
+      <Filter>Header Files\Render Pipeline</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

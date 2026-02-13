@@ -1,5 +1,8 @@
 #pragma once
 #include <stdint.h>
+#include <math.h>
+#include <stdlib.h>
+#include "SDL3/SDL.h"
 
 #define _USE_MATH_DEFINES
 #define FOV_CHOSEN 90
@@ -40,13 +43,13 @@ typedef struct {
 
 typedef struct {
 	Point* global_coords;
-	float x_direction_vector[2];
-	float y_direction_vector[2];
+	Point* x_direction_vector;
+	Point* y_direction_vector;
+	Point* z_direction_vector;
 	FOV* field_of_view;
 } Camera;
 
 Camera* load_camera(unsigned int window_width, unsigned int window_height);
 WorldObjects* load_world_objects();
 WorldObjects* get_on_screen_objects(WorldObjects* world_objects, Camera* camera, unsigned int window_width);
-void rasterize_objects_to_frame(uint32_t* frame, Camera* camera, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects);
 

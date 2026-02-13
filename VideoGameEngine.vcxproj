@@ -127,8 +127,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="camera_space_transform.c" />
     <ClCompile Include="graphics_pipeline.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="rasterizer.c" />
+    <ClCompile Include="scale_to_FOV_transform.c" />
+    <ClCompile Include="transformation_utils.c" />
     <ClCompile Include="world_objects.c" />
   </ItemGroup>
   <ItemGroup>
@@ -137,9 +141,13 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="engine.h" />
     <ClInclude Include="graphics_pipeline.h" />
     <ClInclude Include="main.h" />
+    <ClInclude Include="rasterizer.h" />
+    <ClInclude Include="scale_to_FOV_transform.h" />
+    <ClInclude Include="transformation_utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
