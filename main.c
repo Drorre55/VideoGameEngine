@@ -73,7 +73,6 @@ SDL_AppResult handle_input() {
 		case SDL_EVENT_MOUSE_MOTION:
 			if (event.motion.state == SDL_BUTTON_LEFT) {
 				move_camera_direction(camera, event.motion.xrel, event.motion.yrel, WINDOW_WIDTH, WINDOW_HEIGHT);
-				//SDL_Log("moved camera x,y to - (%f, %f), %f", camera->x_direction_vector[0], camera->y_direction_vector[0], event.motion.yrel);
 			}
 		}
 	}

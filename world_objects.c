@@ -81,7 +81,7 @@ WorldObjects* load_world_objects() {
 	}
 	point_a->x_coord = 20.0;
 	point_a->y_coord = 5.0;
-	point_a->z_coord = 500.0;
+	point_a->z_coord = 50.0;
 	point_a->color = rgba_to_uint32(255, 255, 255, 255);
 
 	Point* point_b = malloc(sizeof(Point));
@@ -92,7 +92,7 @@ WorldObjects* load_world_objects() {
 	}
 	point_b->x_coord = 25.0;
 	point_b->y_coord = 5.0;
-	point_b->z_coord = 500.0;
+	point_b->z_coord = 50.0;
 	point_b->color = rgba_to_uint32(255, 255, 255, 255);
 	
 	Point* point_c = malloc(sizeof(Point));
@@ -103,7 +103,7 @@ WorldObjects* load_world_objects() {
 	}
 	point_c->x_coord = 20.0;
 	point_c->y_coord = 20.0;
-	point_c->z_coord = 500.0;
+	point_c->z_coord = 50.0;
 	point_c->color = rgba_to_uint32(255, 255, 255, 255);
 
 	Point* point_d = malloc(sizeof(Point));
@@ -114,7 +114,7 @@ WorldObjects* load_world_objects() {
 	}
 	point_d->x_coord = 25.0;
 	point_d->y_coord = 20.0;
-	point_d->z_coord = 500.0;
+	point_d->z_coord = 50.0;
 	point_d->color = rgba_to_uint32(255, 255, 255, 255);
 	
 	world_objects->point_objects = malloc(sizeof(Point*) * 4);

@@ -7,11 +7,10 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
 		Point* current_point = world_objects->point_objects[i];
 
 		float distance = sqrt(pow(current_point->x_coord, 2) + pow(current_point->y_coord, 2) + pow(current_point->z_coord, 2));
-
+		
 		current_point->x_coord /= tan(camera->field_of_view->x_degree_from_center) * current_point->z_coord;
 		current_point->y_coord /= tan(camera->field_of_view->y_degree_from_center) * current_point->z_coord;
 		current_point->z_coord = distance;
-		//SDL_Log("transform_scale_to_FOV: (%f, %f, %f)", current_point->x_coord, current_point->y_coord, distance);
 	}
 }
 

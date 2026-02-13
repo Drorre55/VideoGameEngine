@@ -21,5 +21,8 @@ void rasterize_objects_to_frame(uint32_t* frame, Camera* camera, unsigned int fr
 				if ((y_s[j] * frame_width + x_s[i]) < (frame_width * frame_height))
 					frame[y_s[j] * frame_width + x_s[i]] = current_point->color;
 		}
+		free(current_point);
 	}
+	free(on_screen_objects->point_objects);
+	free(on_screen_objects);
 }

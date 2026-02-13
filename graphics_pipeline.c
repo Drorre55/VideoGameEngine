@@ -7,12 +7,12 @@ void move_camera_direction(Camera* camera, float relative_x, float relative_y, u
 	float rotation_degree_x = -relative_x / window_width * (camera->field_of_view->x_degree_from_center * 2);
 	rotate_y_axis(camera->x_direction_vector, rotation_degree_x);
 	rotate_y_axis(camera->z_direction_vector, rotation_degree_x);
-
-	float rotation_degree_y = -relative_y / window_height * (camera->field_of_view->y_degree_from_center * 2);
+	
+	float rotation_degree_y = relative_y / window_height * (camera->field_of_view->y_degree_from_center * 2);
 	rotate_x_axis(camera->y_direction_vector, rotation_degree_y);
 	rotate_x_axis(camera->z_direction_vector, rotation_degree_y);
 
-	SDL_Log("new camera direction: x, y (%f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x_coord, camera->z_direction_vector->y_coord, rotation_degree_x, rotation_degree_y);
+	SDL_Log("new camera direction: xyz (%f, %f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x_coord, camera->z_direction_vector->y_coord, camera->z_direction_vector->z_coord, rotation_degree_x, rotation_degree_y);
 }
 
 void run_graphics_pipeline(uint32_t* framebuffer, WorldObjects* world_objects, Camera* camera, 

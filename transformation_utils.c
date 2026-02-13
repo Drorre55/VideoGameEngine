@@ -11,7 +11,7 @@ void rotate_x_axis(Point* vertice, float rotation_degree)
 void rotate_y_axis(Point* vertice, float rotation_degree)
 {
 	vertice->x_coord = vertice->x_coord * cos(rotation_degree) + vertice->z_coord * sin(rotation_degree);
-	vertice->z_coord = vertice->x_coord * sin(rotation_degree) - vertice->z_coord * cos(rotation_degree);
+	vertice->z_coord = vertice->x_coord * -sin(rotation_degree) + vertice->z_coord * cos(rotation_degree);
 	return vertice;
 }
 
