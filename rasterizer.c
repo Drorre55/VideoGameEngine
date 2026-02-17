@@ -2,27 +2,55 @@
 
 
 void rasterize_objects_to_frame(uint32_t* frame, Camera* camera, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
-	for (int i = 0; i < on_screen_objects->num_points; i++) {
-		Point* current_point = on_screen_objects->point_objects[i];
+	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
+		Triangle* current_triangle = on_screen_objects->triangle_objects[i];
 
-		float x_coord_on_screen = current_point->x_coord * frame_width;
-		float y_coord_on_screen = current_point->y_coord * frame_height;
-		//SDL_Log("screen coords: (%f, %f)", x_coord_on_screen, y_coord_on_screen);
-		unsigned int x_screen = (int)x_coord_on_screen;
-		unsigned int y_screen = (int)y_coord_on_screen;
+		_transform_point_to_pixel_space(current_triangle->corner1, frame_width, frame_height);
+		_transform_point_to_pixel_space(current_triangle->corner2, frame_width, frame_height);
+		_transform_point_to_pixel_space(current_triangle->corner3, frame_width, frame_height);
+		
+		_draw_pixel(frame, frame_width, frame_height, (int)current_triangle->corner1->x_coord,
+			(int)current_triangle->corner1->y_coord, current_triangle->corner1->color);
+		free(current_triangle->corner1);
 
-		unsigned int x_roof_screen = x_screen + 1;
-		unsigned int y_roof_screen = y_screen + 1;
+		_draw_pixel(frame, frame_width, frame_height, (int)current_triangle->corner2->x_coord,
+			(int)current_triangle->corner2->y_coord, current_triangle->corner2->color);
+		free(current_triangle->corner2);
 
-		unsigned int x_s[] = { x_screen, x_roof_screen };
-		unsigned int y_s[] = { y_screen, y_roof_screen };
-		for (int i = 0; i < 2; i++) {
-			for (int j = 0; j < 2; j++)
-				if ((y_s[j] * frame_width + x_s[i]) < (frame_width * frame_height))
-					frame[y_s[j] * frame_width + x_s[i]] = current_point->color;
-		}
-		free(current_point);
+		_draw_pixel(frame, frame_width, frame_height, (int)current_triangle->corner3->x_coord,
+			(int)current_triangle->corner3->y_coord, current_triangle->corner3->color);
+		free(current_triangle->corner3);
+
+		free(current_triangle);
 	}
 	free(on_screen_objects->point_objects);
 	free(on_screen_objects);
+}
+
+void _transform_point_to_pixel_space(Point* point, unsigned int frame_width, unsigned int frame_height)
+{
+	point->x_coord = point->x_coord * frame_width;
+	point->y_coord = point->y_coord * frame_height;
+}
+
+void _draw_pixel(uint32_t* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, uint32_t color)
+{
+	if (!_is_in_frame(frame_width, frame_height, x, y))
+		return;
+
+	unsigned int x_roof_screen = x + 1;
+	unsigned int y_roof_screen = y + 1;
+
+	unsigned int x_s[] = { x, x_roof_screen };
+	unsigned int y_s[] = { y, y_roof_screen };
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < 2; j++)
+			if (_is_in_frame(frame_width, frame_height, x_s[i], y_s[j]))
+				frame[y_s[j] * frame_width + x_s[i]] = color;
+	}
+}
+
+unsigned int _is_in_frame(unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y)
+{
+	return !(x < 0 || x >= frame_width || y < 0 || y >= frame_height);
 }

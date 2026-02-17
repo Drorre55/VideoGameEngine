@@ -66,14 +66,14 @@ Camera* load_camera(unsigned int window_width, unsigned int window_height) {
 }
 
 WorldObjects* load_world_objects() {
-	WorldObjects* world_objects = calloc(1, sizeof(WorldObjects));
+	WorldObjects* world_objects = (WorldObjects**)calloc(1, sizeof(WorldObjects));
 	if (world_objects == NULL) {
 		SDL_Log("problem with malloc. can't load world objects");
 		return NULL;
 	}
 
 	// Just for testing - exchange later with loading from file all world objects
-	Point* point_a = malloc(sizeof(Point));
+	Point* point_a = (Point*)malloc(sizeof(Point));
 	if (point_a == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
 		free(world_objects);
@@ -84,7 +84,7 @@ WorldObjects* load_world_objects() {
 	point_a->z_coord = 50.0;
 	point_a->color = rgba_to_uint32(255, 255, 255, 255);
 
-	Point* point_b = malloc(sizeof(Point));
+	Point* point_b = (Point*)malloc(sizeof(Point));
 	if (point_b == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
 		free(world_objects);
@@ -95,7 +95,7 @@ WorldObjects* load_world_objects() {
 	point_b->z_coord = 50.0;
 	point_b->color = rgba_to_uint32(255, 255, 255, 255);
 	
-	Point* point_c = malloc(sizeof(Point));
+	Point* point_c = (Point*)malloc(sizeof(Point));
 	if (point_c == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
 		free(world_objects);
@@ -106,35 +106,46 @@ WorldObjects* load_world_objects() {
 	point_c->z_coord = 50.0;
 	point_c->color = rgba_to_uint32(255, 255, 255, 255);
 
-	Point* point_d = malloc(sizeof(Point));
-	if (point_d == NULL) {
-		SDL_Log("Problem with malloc. can't load world objects");
-		free(world_objects);
-		return NULL;
-	}
-	point_d->x_coord = 25.0;
-	point_d->y_coord = 20.0;
-	point_d->z_coord = 50.0;
-	point_d->color = rgba_to_uint32(255, 255, 255, 255);
+	//Point* point_d = malloc(sizeof(Point));
+	//if (point_d == NULL) {
+	//	SDL_Log("Problem with malloc. can't load world objects");
+	//	free(world_objects);
+	//	return NULL;
+	//}
+	//point_d->x_coord = 25.0;
+	//point_d->y_coord = 20.0;
+	//point_d->z_coord = 50.0;
+	//point_d->color = rgba_to_uint32(255, 255, 255, 255);
 	
-	world_objects->point_objects = malloc(sizeof(Point*) * 4);
-	if (world_objects->point_objects == NULL) {
+	Triangle* triangle = (Triangle*)malloc(sizeof(Triangle));
+	if (triangle == NULL) {
 		SDL_Log("Problem with malloc. can't store point objects");
 		free(point_a);
+		free(point_b);
+		free(point_c);
 		free(world_objects);
 		return NULL;
 	}
-	world_objects->point_objects[0] = point_a;
-	world_objects->num_points++;
 
-	world_objects->point_objects[1] = point_b;
-	world_objects->num_points++;
+	world_objects->triangle_objects = (Triangle**)malloc(sizeof(Triangle*));
+	if (world_objects->triangle_objects == NULL) {
+		SDL_Log("Problem with malloc. can't store point objects");
+		free(point_a);
+		free(point_b);
+		free(point_c);
+		free(triangle);
+		free(world_objects);
+		return NULL;
+	}
+	triangle->corner1 = point_a;
+	triangle->corner2 = point_b;
+	triangle->corner3 = point_c;
 
-	world_objects->point_objects[2] = point_c;
-	world_objects->num_points++;
+	world_objects->triangle_objects[0] = triangle;
+	world_objects->num_triangles++;
 
-	world_objects->point_objects[3] = point_d;
-	world_objects->num_points++;
+	//world_objects->point_objects[3] = point_d;
+	//world_objects->num_points++;
 
 	return world_objects;
 }

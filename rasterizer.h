@@ -8,3 +8,7 @@ void rasterize_objects_to_frame(
 	unsigned int frame_height, 
 	WorldObjects* on_screen_objects
 );
+
+void _transform_point_to_pixel_space(Point* point, unsigned int frame_width, unsigned int frame_height);
+void _draw_pixel(uint32_t* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, uint32_t color);
+unsigned int _is_in_frame(unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y);
