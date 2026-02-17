@@ -1,5 +1,5 @@
 #pragma once
-#include "engine.h"
+#include "world_objects.h"
 
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera);
 void cut_objects_outside_FOV(WorldObjects* world_objects);

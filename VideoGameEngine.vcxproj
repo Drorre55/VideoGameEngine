@@ -142,9 +142,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera_space_transform.h" />
-    <ClInclude Include="engine.h" />
+    <ClInclude Include="world_objects.h" />
     <ClInclude Include="graphics_pipeline.h" />
-    <ClInclude Include="main.h" />
     <ClInclude Include="rasterizer.h" />
     <ClInclude Include="scale_to_FOV_transform.h" />
     <ClInclude Include="transformation_utils.h" />

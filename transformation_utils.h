@@ -1,5 +1,5 @@
 #pragma once
-#include "engine.h"
+#include "world_objects.h"
 
 void rotate_x_axis(Point* vertice, float rotation_degree);
 void rotate_y_axis(Point* vertice, float rotation_degree);

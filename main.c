@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "SDL3/SDL.h"
-#include "main.h"
-#include "engine.h"
+#include "world_objects.h"
 #include "graphics_pipeline.h"
 
 

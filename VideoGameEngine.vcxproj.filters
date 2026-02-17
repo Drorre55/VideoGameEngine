@@ -44,10 +44,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="main.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="engine.h">
+    <ClInclude Include="world_objects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="graphics_pipeline.h">

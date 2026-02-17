@@ -1,5 +1,5 @@
 #pragma once
-#include "engine.h"
+#include "world_objects.h"
 #include "transformation_utils.h"
 #include "camera_space_transform.h"
 #include "scale_to_FOV_transform.h"
