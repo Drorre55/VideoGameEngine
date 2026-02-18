@@ -11,7 +11,7 @@ typedef struct {
 	float x_coord;
 	float y_coord;
 	float z_coord;
-	uint32_t color;
+	unsigned int color[4];
 } Point;
 
 typedef struct {
