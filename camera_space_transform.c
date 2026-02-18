@@ -51,6 +51,7 @@ Point* _transform_point_from_world_to_camera_space(Point* point, Camera* camera,
 	transformed_point->x_coord = point->x_coord - camera->global_coords->x_coord;
 	transformed_point->y_coord = point->y_coord - camera->global_coords->y_coord;
 	transformed_point->z_coord = point->z_coord - camera->global_coords->z_coord;
+	transformed_point->color = point->color;
 
 	rotate_x_axis(transformed_point, rotation_degrees[0]);
 	rotate_y_axis(transformed_point, rotation_degrees[1]);

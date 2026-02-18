@@ -2,10 +2,6 @@
 #include <math.h>
 
 
-uint32_t rgba_to_uint32(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a;
-}
-
 Camera* load_camera(unsigned int window_width, unsigned int window_height) {
 	Camera* camera = calloc(1, sizeof(Camera));
 	if (camera == NULL) {

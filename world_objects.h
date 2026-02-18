@@ -51,4 +51,3 @@ typedef struct {
 
 Camera* load_camera(unsigned int window_width, unsigned int window_height);
 WorldObjects* load_world_objects();
-
