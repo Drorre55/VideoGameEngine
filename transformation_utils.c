@@ -5,22 +5,22 @@ uint32_t rgba_to_uint32(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	return ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | (uint32_t)a;
 }
 
-void rotate_x_axis(Point* vertice, float rotation_degree)
+void rotate_x_axis(Vec3* vertice, float rotation_degree)
 {
-	vertice->y_coord = vertice->y_coord * cos(rotation_degree) - vertice->z_coord * sin(rotation_degree);
-	vertice->z_coord = vertice->y_coord * sin(rotation_degree) + vertice->z_coord * cos(rotation_degree);
+	vertice->y = vertice->y * cos(rotation_degree) - vertice->z * sin(rotation_degree);
+	vertice->z = vertice->y * sin(rotation_degree) + vertice->z * cos(rotation_degree);
 }
 
-void rotate_y_axis(Point* vertice, float rotation_degree)
+void rotate_y_axis(Vec3* vertice, float rotation_degree)
 {
-	vertice->x_coord = vertice->x_coord * cos(rotation_degree) + vertice->z_coord * sin(rotation_degree);
-	vertice->z_coord = vertice->x_coord * -sin(rotation_degree) + vertice->z_coord * cos(rotation_degree);
+	vertice->x = vertice->x * cos(rotation_degree) + vertice->z * sin(rotation_degree);
+	vertice->z = vertice->x * -sin(rotation_degree) + vertice->z * cos(rotation_degree);
 }
 
-void rotate_z_axis(Point* vertice, float rotation_degree)
+void rotate_z_axis(Vec3* vertice, float rotation_degree)
 {
-	vertice->x_coord = vertice->x_coord * cos(rotation_degree) - vertice->y_coord * sin(rotation_degree);
-	vertice->y_coord = vertice->x_coord * sin(rotation_degree) + vertice->y_coord * cos(rotation_degree);
+	vertice->x = vertice->x * cos(rotation_degree) - vertice->y * sin(rotation_degree);
+	vertice->y = vertice->x * sin(rotation_degree) + vertice->y * cos(rotation_degree);
 }
 
 float* normalize_vector(float* vector, unsigned int num_dims)

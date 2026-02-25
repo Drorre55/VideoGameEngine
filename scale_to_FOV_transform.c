@@ -6,19 +6,19 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
 	for (int i = 0; i < world_objects->num_triangles; i++) {
 		Triangle* current_triangle = world_objects->triangle_objects[i];
 
-		_transform_point_scale_to_FOV(current_triangle->corner1, camera);
-		_transform_point_scale_to_FOV(current_triangle->corner2, camera);
-		_transform_point_scale_to_FOV(current_triangle->corner3, camera);
+		_transform_point_scale_to_FOV(current_triangle->corner1->coords, camera);
+		_transform_point_scale_to_FOV(current_triangle->corner2->coords, camera);
+		_transform_point_scale_to_FOV(current_triangle->corner3->coords, camera);
 	}
 }
 
-void _transform_point_scale_to_FOV(Point* point, Camera* camera)
+void _transform_point_scale_to_FOV(Vec3* coords, Camera* camera)
 {
-	float distance = sqrt(pow(point->x_coord, 2) + pow(point->y_coord, 2) + pow(point->z_coord, 2));
+	float distance = sqrt(pow(coords->x, 2) + pow(coords->y, 2) + pow(coords->z, 2));
 
-	point->x_coord /= tan(camera->field_of_view->x_degree_from_center) * point->z_coord;
-	point->y_coord /= tan(camera->field_of_view->y_degree_from_center) * point->z_coord;
-	point->z_coord = distance;
+	coords->x /= tan(camera->field_of_view->x_degree_from_center) * coords->z;
+	coords->y /= tan(camera->field_of_view->y_degree_from_center) * coords->z;
+	coords->z = distance;
 }
 
 void cut_objects_completely_outside_FOV(WorldObjects* FOV_space_objects) {
@@ -44,17 +44,16 @@ void cut_objects_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 
 unsigned int _count_points_inside_FOV(Triangle* triangle) {
 	unsigned int num_points_on_screen = 
-		_is_inside_FOV(triangle->corner1) + 
-		_is_inside_FOV(triangle->corner2) +
-		_is_inside_FOV(triangle->corner3);
-	
+		_is_inside_FOV(triangle->corner1->coords) + 
+		_is_inside_FOV(triangle->corner2->coords) +
+		_is_inside_FOV(triangle->corner3->coords);
 	return num_points_on_screen;
 }
 
-unsigned int _is_inside_FOV(Point* point)
+unsigned int _is_inside_FOV(Vec3* coords)
 {
-	unsigned int is_outside_x_range = point->x_coord < -1 || point->x_coord > 1;
-	unsigned int is_outside_y_range = point->y_coord < -1 || point->y_coord > 1;
+	unsigned int is_outside_x_range = coords->x < -1 || coords->x > 1;
+	unsigned int is_outside_y_range = coords->y < -1 || coords->y > 1;
 	return !is_outside_x_range && !is_outside_y_range;
 }
 
@@ -62,14 +61,14 @@ void transform_xy_from_FOV_space_to_01_scale(WorldObjects* world_objects) {
 	for (int i = 0; i < world_objects->num_triangles; i++) {
 		Triangle* current_triangle = world_objects->triangle_objects[i];
 
-		_transform_point_xy_to_01_scale(current_triangle->corner1);
-		_transform_point_xy_to_01_scale(current_triangle->corner2);
-		_transform_point_xy_to_01_scale(current_triangle->corner3);
+		_transform_point_xy_to_01_scale(current_triangle->corner1->coords);
+		_transform_point_xy_to_01_scale(current_triangle->corner2->coords);
+		_transform_point_xy_to_01_scale(current_triangle->corner3->coords);
 	}
 }
 
-void _transform_point_xy_to_01_scale(Point* point)
+void _transform_point_xy_to_01_scale(Vec3* coords)
 {
-	point->x_coord = (point->x_coord + 1) / 2;
-	point->y_coord = (point->y_coord + 1) / 2;
+	coords->x = (coords->x + 1) / 2;
+	coords->y = (coords->y + 1) / 2;
 }

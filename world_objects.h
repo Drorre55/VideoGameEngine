@@ -8,18 +8,13 @@
 #define FOV_CHOSEN 90
 
 typedef struct {
-	float x_coord;
-	float y_coord;
-	float z_coord;
-	unsigned int color[4];
-} Point;
+	float x, y, z;
+} Vec3;
 
 typedef struct {
-	Point* corner1;
-	Point* corner2;
-	Point* corner3;
-	Point* corner4;
-} Box;
+	Vec3* coords;
+	unsigned int color[4];
+} Point;
 
 typedef struct {
 	Point* corner1;
@@ -30,8 +25,6 @@ typedef struct {
 typedef struct {
 	Point** point_objects;
 	unsigned int num_points;
-	Box** box_objects;
-	unsigned int num_boxes;
 	Triangle** triangle_objects;
 	unsigned int num_triangles;
 } WorldObjects;
@@ -42,10 +35,10 @@ typedef struct {
 } FOV;
 
 typedef struct {
-	Point* global_coords;
-	Point* x_direction_vector;
-	Point* y_direction_vector;
-	Point* z_direction_vector;
+	Vec3* global_coords;
+	Vec3* x_direction_vector;
+	Vec3* y_direction_vector;
+	Vec3* z_direction_vector;
 	FOV* field_of_view;
 } Camera;
 

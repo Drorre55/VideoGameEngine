@@ -7,7 +7,7 @@ void rasterize_objects_to_frame(
 	unsigned int frame_height, 
 	WorldObjects* on_screen_objects
 );
-void _transform_point_to_pixel_space(Point* point, unsigned int frame_width, unsigned int frame_height);
+void _transform_point_to_pixel_space(Vec3* coords, unsigned int frame_width, unsigned int frame_height);
 void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height);
 Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c);
 unsigned int* _interpolate_color(float weights[3], unsigned int corners_color[3][4]);

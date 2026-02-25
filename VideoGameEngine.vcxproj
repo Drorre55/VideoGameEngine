@@ -133,6 +133,7 @@
     <ClCompile Include="rasterizer.c" />
     <ClCompile Include="scale_to_FOV_transform.c" />
     <ClCompile Include="transformation_utils.c" />
+    <ClCompile Include="user_input.c" />
     <ClCompile Include="world_objects.c" />
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +143,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera_space_transform.h" />
+    <ClInclude Include="user_input.h" />
     <ClInclude Include="world_objects.h" />
     <ClInclude Include="graphics_pipeline.h" />
     <ClInclude Include="rasterizer.h" />

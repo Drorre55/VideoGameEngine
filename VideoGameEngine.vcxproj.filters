@@ -42,6 +42,9 @@
     <ClCompile Include="rasterizer.c">
       <Filter>Source Files\Render Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="user_input.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -61,6 +64,9 @@
     </ClInclude>
     <ClInclude Include="rasterizer.h">
       <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="user_input.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

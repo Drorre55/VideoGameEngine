@@ -2,6 +2,7 @@
 #include "SDL3/SDL.h"
 #include "world_objects.h"
 #include "graphics_pipeline.h"
+#include "user_input.h"
 
 
 #define WINDOW_WIDTH 800
@@ -58,23 +59,13 @@ SDL_AppResult load_world() {
 }
 
 SDL_AppResult handle_input() {
-	SDL_Event event;
+	SDL_AppResult app_result;
 
-	while (SDL_PollEvent(&event)) {
-		switch (event.type) {
-		case SDL_EVENT_QUIT:
-			return SDL_APP_SUCCESS;
-
-		// TODO: Add events
-		case SDL_EVENT_MOUSE_BUTTON_DOWN:
-			SDL_Log("mouse down on pixel: (%d, %d)", (int)event.button.y, (int)event.button.x);
-		
-		case SDL_EVENT_MOUSE_MOTION:
-			if (event.motion.state == SDL_BUTTON_LEFT) {
-				move_camera_direction(camera, event.motion.xrel, event.motion.yrel, WINDOW_WIDTH, WINDOW_HEIGHT);
-			}
-		}
-	}
+	app_result = user_events(camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+	if (app_result != SDL_APP_CONTINUE)
+		return app_result;
+	
+	move_camera_location(direction_user_should_move(), camera);
 
 	return SDL_APP_CONTINUE;
 }
@@ -87,9 +78,7 @@ SDL_AppResult render() {
 			framebuffer[row * WINDOW_WIDTH + column] = rgba_to_uint32(0, 0, 255, 200);
 		}
 	}
-
 	run_graphics_pipeline(framebuffer, worldObjects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
-
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 
 	SDL_RenderClear(renderer);
@@ -107,8 +96,11 @@ void main() {
 	int engine_status = SDL_APP_CONTINUE;
 
 	engine_status = initialize();
+	SDL_Log("initialized engine");
+
 	if (engine_status == SDL_APP_CONTINUE)
 		engine_status = load_world();
+	SDL_Log("loaded world");
 
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {

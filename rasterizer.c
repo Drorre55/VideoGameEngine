@@ -15,9 +15,9 @@ void rasterize_objects_to_frame(uint32_t* frame, unsigned int frame_width, unsig
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
 		Triangle* current_triangle = on_screen_objects->triangle_objects[i];
 		
-		_transform_point_to_pixel_space(current_triangle->corner1, frame_width, frame_height);
-		_transform_point_to_pixel_space(current_triangle->corner2, frame_width, frame_height);
-		_transform_point_to_pixel_space(current_triangle->corner3, frame_width, frame_height);
+		_transform_point_to_pixel_space(current_triangle->corner1->coords, frame_width, frame_height);
+		_transform_point_to_pixel_space(current_triangle->corner2->coords, frame_width, frame_height);
+		_transform_point_to_pixel_space(current_triangle->corner3->coords, frame_width, frame_height);
 		
 		_draw_triangle(current_triangle, frame, z_buffer, frame_width, frame_height);
 
@@ -32,10 +32,10 @@ void rasterize_objects_to_frame(uint32_t* frame, unsigned int frame_width, unsig
 	free(z_buffer);
 }
 
-void _transform_point_to_pixel_space(Point* point, unsigned int frame_width, unsigned int frame_height)
+void _transform_point_to_pixel_space(Vec3* coords, unsigned int frame_width, unsigned int frame_height)
 {
-	point->x_coord = point->x_coord * frame_width;
-	point->y_coord = point->y_coord * frame_height;
+	coords->x = coords->x * frame_width;
+	coords->y = coords->y * frame_height;
 }
 
 void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
@@ -46,22 +46,22 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	Point* B = sorted_points[1];
 	Point* C = sorted_points[2];
 
-	float AB_slope = (B->y_coord - A->y_coord) / (B->x_coord - A->x_coord);
-	float AC_slope = (C->y_coord - A->y_coord) / (C->x_coord - A->x_coord);
+	float AB_slope = (B->coords->y - A->coords->y) / (B->coords->x - A->coords->x);
+	float AC_slope = (C->coords->y - A->coords->y) / (C->coords->x - A->coords->x);
 
-	float corners_x[3] = { A->x_coord, B->x_coord, C->x_coord };
-	float corners_y[3] = { A->y_coord, B->y_coord, C->y_coord };
-	float corners_z[3] = { A->z_coord, B->z_coord, C->z_coord };
+	float corners_x[3] = { A->coords->x, B->coords->x, C->coords->x };
+	float corners_y[3] = { A->coords->y, B->coords->y, C->coords->y };
+	float corners_z[3] = { A->coords->z, B->coords->z, C->coords->z };
 	unsigned int corners_color[3][4];
 	memcpy(corners_color[0], A->color, sizeof(A->color));
 	memcpy(corners_color[1], B->color, sizeof(B->color));
 	memcpy(corners_color[2], C->color, sizeof(C->color));
 	
 	// walk from min x value and per column calc the edges pixels, then color between them
-	for (float current_x = A->x_coord; current_x <= B->x_coord; current_x++) {
+	for (float current_x = A->coords->x; current_x <= B->coords->x; current_x++) {
 		// get the edges of the triangle in this column
-		float AB_function = A->y_coord + AB_slope * (current_x - A->x_coord);
-		float AC_function = A->y_coord + AC_slope * (current_x - A->x_coord);
+		float AB_function = A->coords->y + AB_slope * (current_x - A->coords->x);
+		float AC_function = A->coords->y + AC_slope * (current_x - A->coords->x);
 
 		float y_coord_range[2];
 		if (AB_function <= AC_function) {
@@ -87,10 +87,10 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 		}
 	}
 	// do the same from the mid x corner. (we can't continue the same becaue the first slope is irrelivant)
-	float BC_slope = (C->y_coord - B->y_coord) / (C->x_coord - B->x_coord);
-	for (float current_x = B->x_coord; current_x <= C->x_coord; current_x++) {
-		float BC_function = B->y_coord + BC_slope * (current_x - B->x_coord);
-		float AC_function = A->y_coord + AC_slope * (current_x - A->x_coord);
+	float BC_slope = (C->coords->y - B->coords->y) / (C->coords->x - B->coords->x);
+	for (float current_x = B->coords->x; current_x <= C->coords->x; current_x++) {
+		float BC_function = B->coords->y + BC_slope * (current_x - B->coords->x);
+		float AC_function = A->coords->y + AC_slope * (current_x - A->coords->x);
 
 		float y_coord_range[2];
 		if (BC_function <= AC_function) {
@@ -116,9 +116,6 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 			}
 		}
 	}
-	//_draw_pixel(frame, frame_width, frame_height, (int)A->x_coord, (int)A->y_coord, A->color);
-	//_draw_pixel(frame, frame_width, frame_height, (int)B->x_coord, (int)B->y_coord, B->color);
-	//_draw_pixel(frame, frame_width, frame_height, (int)C->x_coord, (int)C->y_coord, C->color);
 }
 
 Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
@@ -129,10 +126,10 @@ Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
 		return NULL;
 	}
 
-	if (point_a->x_coord <= point_b->x_coord &&
-		point_a->x_coord <= point_c->x_coord) {
+	if (point_a->coords->x <= point_b->coords->x &&
+		point_a->coords->x <= point_c->coords->x) {
 		points_asc[0] = point_a;
-		if (point_b->x_coord <= point_c->x_coord) {
+		if (point_b->coords->x <= point_c->coords->x) {
 			points_asc[1] = point_b;
 			points_asc[2] = point_c;
 		}
@@ -141,10 +138,10 @@ Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
 			points_asc[2] = point_b;
 		}
 	}
-	else if (point_b->x_coord <= point_a->x_coord &&
-		point_b->x_coord <= point_c->x_coord) {
+	else if (point_b->coords->x <= point_a->coords->x &&
+		point_b->coords->x <= point_c->coords->x) {
 		points_asc[0] = point_b;
-		if (point_a->x_coord <= point_c->x_coord) {
+		if (point_a->coords->x <= point_c->coords->x) {
 			points_asc[1] = point_a;
 			points_asc[2] = point_c;
 		}
@@ -155,7 +152,7 @@ Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
 	}
 	else {
 		points_asc[0] = point_c;
-		if (point_a->x_coord <= point_b->x_coord) {
+		if (point_a->coords->x <= point_b->coords->x) {
 			points_asc[1] = point_a;
 			points_asc[2] = point_b;
 		}

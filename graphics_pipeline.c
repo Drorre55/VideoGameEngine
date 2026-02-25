@@ -2,7 +2,7 @@
 #include "graphics_pipeline.h"
 
 
-void move_camera_direction(Camera* camera, float relative_x, float relative_y, unsigned int window_width, unsigned int window_height) {
+void move_camera_direction(float relative_x, float relative_y, Camera* camera, unsigned int window_width, unsigned int window_height) {
 	// In the future if I will add Screw rotation than add rotate z_axis
 	float rotation_degree_x = -relative_x / window_width * (camera->field_of_view->x_degree_from_center * 2);
 	rotate_y_axis(camera->x_direction_vector, rotation_degree_x);
@@ -12,7 +12,17 @@ void move_camera_direction(Camera* camera, float relative_x, float relative_y, u
 	rotate_x_axis(camera->y_direction_vector, rotation_degree_y);
 	rotate_x_axis(camera->z_direction_vector, rotation_degree_y);
 
-	SDL_Log("new camera direction: xyz (%f, %f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x_coord, camera->z_direction_vector->y_coord, camera->z_direction_vector->z_coord, rotation_degree_x, rotation_degree_y);
+	SDL_Log("new camera direction: xyz (%f, %f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x, camera->z_direction_vector->y, camera->z_direction_vector->z, rotation_degree_x, rotation_degree_y);
+}
+
+void move_camera_location(Vec3* direction, Camera* camera)
+{
+	if (!direction->x && !direction->y && !direction->z)
+		return;
+	camera->global_coords->x += (camera->x_direction_vector->x * -direction->x);
+	camera->global_coords->y += (camera->y_direction_vector->y * direction->y);
+	camera->global_coords->z += (camera->z_direction_vector->z * direction->z);
+	SDL_Log("new camera location: xyz (%f, %f, %f). direction(%f, %f, %f):", camera->global_coords->x, camera->global_coords->y, camera->global_coords->z, direction->x, direction->y, direction->z);
 }
 
 void run_graphics_pipeline(uint32_t* framebuffer, WorldObjects* world_objects, Camera* camera, 
