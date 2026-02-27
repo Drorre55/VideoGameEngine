@@ -50,53 +50,70 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	Point* B = sorted_points[1];
 	Point* C = sorted_points[2];
 
-	// Precompute slopes for edge stepping (used to compute column y-range)
-	float AB_slope = (B->coords->y - A->coords->y) / (B->coords->x - A->coords->x);
-	float AC_slope = (C->coords->y - A->coords->y) / (C->coords->x - A->coords->x);
-
 	// Copy corner data to local variables for faster access
 	float Ax = A->coords->x, Bx = B->coords->x, Cx = C->coords->x;
 	float Ay = A->coords->y, By = B->coords->y, Cy = C->coords->y;
 	float Az =A->coords->z, Bz = B->coords->z, Cz = C->coords->z;
-
+	
 	unsigned int corners_color[3][4];
 	memcpy(corners_color[0], A->color, sizeof(A->color));
 	memcpy(corners_color[1], B->color, sizeof(B->color));
 	memcpy(corners_color[2], C->color, sizeof(C->color));
 
-	// Compute area for barycentric coordinates (area * 2). If zero, triangle is degenerate
-	const float triangle_area = (By - Cy) * (Ax - Cx) + (Cx - Bx) * (Ay - Cy);
-	if (triangle_area == 0.0f) {
+	// Precompute edges
+	float ABx = Bx - Ax, ABy = By - Ay;
+	float ACx = Cx - Ax, ACy = Cy - Ay;
+	float CBx = Bx - Cx, CBy = By - Cy;
+
+	// Compute (area * 2) for barycentric coordinates. If zero, triangle is degenerate
+	const float triangle_area2 = (Ax - Cx) * CBy - CBx * (Ay - Cy);
+	if (triangle_area2 == 0.0f) {
 		free(sorted_points);
 		return;
 	}
-	const float inverse_triangle_area = 1.0f / triangle_area;
+	const float inverse_triangle_area = 1.0f / triangle_area2;
 
-	int half1_start_x = (int)floorf(glm_clamp(A->coords->x, 0.0, frame_width - 1));
-	int half1_end_x = (int)floorf(glm_clamp(B->coords->x, 0.0, frame_width - 1));
-	// walk columns from A.x to B.x (left half), and per column calc the edges pixels, then color between them
-	for (int current_x = half1_start_x; current_x <= half1_end_x; current_x++) {
-		// get the edges of the triangle in this column
-		float AB_function = A->coords->y + AB_slope * ((float)current_x - A->coords->x);
-		float AC_function = A->coords->y + AC_slope * ((float)current_x - A->coords->x);
+	int half1_start_x = (int)floorf(glm_clamp(Ax, 0.0, frame_width - 1));
+	int half1_end_x = (int)ceilf(glm_clamp(Bx, 0.0, frame_width - 1));
+	int half2_end_x = (int)ceilf(glm_clamp(Cx, 0.0, frame_width - 1));
 
-		int y_min = (int)floorf(glm_clamp(fminf(AB_function, AC_function), 0.0, frame_height - 1));
-		int y_max = (int)floorf(glm_clamp(fmaxf(AB_function, AC_function), 0.0, frame_height - 1));
+	// Precompute slopes for edge stepping (used to compute column y-range)
+	float AB_slope = ABy / ABx;
+	float AC_slope = ACy / ACx;
+	float BC_slope = CBy / CBx;
 
+	// get the edges of the triangle in this column
+	float AB_function = Ay + AB_slope * (half1_start_x - Ax);
+	float AC_function = Ay + AC_slope * (half1_start_x - Ax);
+	float BC_function = By + BC_slope * (half1_end_x - Bx);
+
+	float slope2 = AB_slope;
+	float edge_function2 = AB_function;
+
+	// walk columns from A.x to B.x (left half), then switch to B.x -> C.x (right half), and per column calc the edges pixels, then color between them
+	for (int current_x = half1_start_x; current_x <= half2_end_x; current_x++) {
+		if (current_x == half1_end_x) {
+			slope2 = BC_slope;
+			edge_function2 = BC_function;
+		}
+
+		int y_min = (int)floorf(glm_clamp(fminf(edge_function2, AC_function), 0.0, frame_height - 1));
+		int y_max = (int)ceilf(glm_clamp(fmaxf(edge_function2, AC_function), 0.0, frame_height - 1));
+
+		// calc weights using the Barycentric method ones per column, then foreach row change according to previous pixel
+		float A_weight = ((current_x - Cx) * CBy - (y_min - Cy) * CBx) * inverse_triangle_area;
+		float B_weight = ((current_x - Ax) * ACy - (y_min - Ay) * ACx) * inverse_triangle_area;
+		float C_weight = 1.0f - A_weight - B_weight;
+		
 		for (int current_y = y_min; current_y <= y_max; current_y++) {
-			const float px = (float)current_x;
-			const float py = (float)current_y;
-
-			float A_weight = ((By - Cy) * (px - Cx) + (Cx - Bx) * (py - Cy)) * inverse_triangle_area;
-			float B_weight = ((Cy - Ay) * (px - Cx) + (Ax - Cx) * (py - Cy)) * inverse_triangle_area;
-			float C_weight = 1.0f - A_weight - B_weight;
-			
 			float pixel_distance = Az * A_weight + Bz * B_weight + Cz * C_weight;
 			int pixel_idx = current_y * frame_width + current_x;
 			if (pixel_distance < z_buffer[pixel_idx]) {
 				z_buffer[pixel_idx] = pixel_distance;
 
 				unsigned int interpolated_color[4];
+				//float weights[3] = { A_weight, B_weight, C_weight };
+				//_interpolate_color(weights, corners_color , interpolated_color);
 				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
 					float color_ingrediant = (float)corners_color[0][color_ingrediant_idx] * A_weight
 										   + (float)corners_color[1][color_ingrediant_idx] * B_weight
@@ -105,42 +122,14 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 				}
 				_draw_pixel(frame, frame_width, frame_height, (unsigned int)current_x, (unsigned int)current_y, interpolated_color);
 			}
+			// move y 1 unit up
+			A_weight -= CBx * inverse_triangle_area;
+			B_weight -= ACx * inverse_triangle_area;
+			C_weight = 1.0f - A_weight - B_weight;
 		}
-	}
-	// do the same from the mid x corner. (we can't continue the same becaue the first slope is irrelivant)
-	float BC_slope = (C->coords->y - B->coords->y) / (C->coords->x - B->coords->x);
-	int half2_end_x = (int)floorf(glm_clamp(C->coords->x, 0.0, frame_width - 1));
-
-	for (int current_x = half1_end_x; current_x <= half2_end_x; current_x++) {
-		float BC_function = B->coords->y + BC_slope * ((float)current_x - B->coords->x);
-		float AC_function = A->coords->y + AC_slope * ((float)current_x - A->coords->x);
-
-		int y_min = (int)floorf(glm_clamp(fminf(BC_function, AC_function), 0.0, frame_height - 1));
-		int y_max = (int)floorf(glm_clamp(fmaxf(BC_function, AC_function), 0.0, frame_height - 1));
-
-		for (int current_y = y_min; current_y <= y_max; current_y++) {
-			const float px = (float)current_x;
-			const float py = (float)current_y;
-
-			float A_weight = ((By - Cy) * (px - Cx) + (Cx - Bx) * (py - Cy)) * inverse_triangle_area;
-			float B_weight = ((Cy - Ay) * (px - Cx) + (Ax - Cx) * (py - Cy)) * inverse_triangle_area;
-			float C_weight = 1.0f - A_weight - B_weight;
-
-			float pixel_distance = Az * A_weight + Bz * B_weight + Cz * C_weight;
-			int pixel_idx = current_y * frame_width + current_x;
-			if (pixel_distance < z_buffer[pixel_idx]) {
-				z_buffer[pixel_idx] = pixel_distance;
-
-				unsigned int interpolated_color[4];
-				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
-					float color_ingrediant = (float)corners_color[0][color_ingrediant_idx] * A_weight
-										   + (float)corners_color[1][color_ingrediant_idx] * B_weight
-										   + (float)corners_color[2][color_ingrediant_idx] * C_weight;
-					interpolated_color[color_ingrediant_idx] = (unsigned int)glm_clamp(color_ingrediant, 0.0f, 255.0f);
-				}
-				_draw_pixel(frame, frame_width, frame_height, (unsigned int)current_x, (unsigned int)current_y, interpolated_color);
-			}
-		}
+		// move x 1 unit right
+		edge_function2 += slope2;
+		AC_function += AC_slope;
 	}
 	free(sorted_points);
 }
@@ -189,40 +178,6 @@ Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
 		}
 	}
 	return points_asc;
-}
-
-unsigned int* _interpolate_color(float weights[3], unsigned int corners_color[3][4]) {
-	float* interpolated_color = calloc(1, sizeof(float) * 4);
-	if (interpolated_color == NULL) {
-		SDL_LogError(1, "Problem with calloc. can't interpolate color");
-		return NULL;
-	}
-
-	for (int color_ingredient_idx = 0; color_ingredient_idx < 4; color_ingredient_idx++) {
-		for (int corner_idx = 0; corner_idx < 3; corner_idx++) {
-			interpolated_color[color_ingredient_idx] += corners_color[corner_idx][color_ingredient_idx] * weights[corner_idx];
-		}
-	}
-	
-	unsigned int* int_color = calloc(1, sizeof(unsigned int) * 4);
-	if (int_color == NULL) {
-		SDL_LogError(1, "Problem with calloc. can't interpolate color");
-		return NULL;
-	}
-	for (int color_ingredient_idx = 0; color_ingredient_idx < 4; color_ingredient_idx++) {
-		int_color[color_ingredient_idx] = (unsigned int)interpolated_color[color_ingredient_idx];
-	}
-	free(interpolated_color);
-	return int_color;
-}
-
-float _interpolate_distance(float* weights, float* corners_z, unsigned int num_objects)
-{
-	float distance = 0;
-	for (int i = 0; i < num_objects; i++) {
-		distance += weights[i] * corners_z[i];
-	}
-	return distance;
 }
 
 void _draw_pixel(uint32_t* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, unsigned int* color)
