@@ -12,7 +12,7 @@ void move_camera_direction(float relative_x, float relative_y, Camera* camera, u
 	rotate_x_axis(camera->y_direction_vector, rotation_degree_y);
 	rotate_x_axis(camera->z_direction_vector, rotation_degree_y);
 
-	SDL_Log("new camera direction: xyz (%f, %f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x, camera->z_direction_vector->y, camera->z_direction_vector->z, rotation_degree_x, rotation_degree_y);
+	//SDL_Log("new camera direction: xyz (%f, %f, %f). rotation_degree_x: %f, rotation_degree_y: %f", camera->z_direction_vector->x, camera->z_direction_vector->y, camera->z_direction_vector->z, rotation_degree_x, rotation_degree_y);
 }
 
 void move_camera_location(Vec3* direction, Camera* camera)
@@ -22,7 +22,7 @@ void move_camera_location(Vec3* direction, Camera* camera)
 	camera->global_coords->x += (camera->x_direction_vector->x * -direction->x);
 	camera->global_coords->y += (camera->y_direction_vector->y * direction->y);
 	camera->global_coords->z += (camera->z_direction_vector->z * direction->z);
-	SDL_Log("new camera location: xyz (%f, %f, %f). direction(%f, %f, %f):", camera->global_coords->x, camera->global_coords->y, camera->global_coords->z, direction->x, direction->y, direction->z);
+	//SDL_Log("new camera location: xyz (%f, %f, %f). direction(%f, %f, %f):", camera->global_coords->x, camera->global_coords->y, camera->global_coords->z, direction->x, direction->y, direction->z);
 }
 
 void run_graphics_pipeline(uint32_t* framebuffer, WorldObjects* world_objects, Camera* camera, 

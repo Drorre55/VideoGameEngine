@@ -104,6 +104,7 @@ void main() {
 
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {
+			Uint64 current_tick = SDL_GetTicks();
 			engine_status = handle_input();
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
@@ -111,6 +112,7 @@ void main() {
 			engine_status = render();
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
+			SDL_Log("render time: %d", SDL_GetTicks() - current_tick);
 		}
 	}
 	

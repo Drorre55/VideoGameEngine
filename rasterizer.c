@@ -1,5 +1,6 @@
 #include "rasterizer.h"
 #include "transformation_utils.h"
+#include "cglm/cglm.h"
 #define CORNERS 3
 
 
@@ -21,8 +22,11 @@ void rasterize_objects_to_frame(uint32_t* frame, unsigned int frame_width, unsig
 		
 		_draw_triangle(current_triangle, frame, z_buffer, frame_width, frame_height);
 
+		free(current_triangle->corner1->coords);
 		free(current_triangle->corner1);
+		free(current_triangle->corner2->coords);
 		free(current_triangle->corner2);
+		free(current_triangle->corner3->coords);
 		free(current_triangle->corner3);
 
 		free(current_triangle);
@@ -46,76 +50,99 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	Point* B = sorted_points[1];
 	Point* C = sorted_points[2];
 
+	// Precompute slopes for edge stepping (used to compute column y-range)
 	float AB_slope = (B->coords->y - A->coords->y) / (B->coords->x - A->coords->x);
 	float AC_slope = (C->coords->y - A->coords->y) / (C->coords->x - A->coords->x);
 
-	float corners_x[3] = { A->coords->x, B->coords->x, C->coords->x };
-	float corners_y[3] = { A->coords->y, B->coords->y, C->coords->y };
-	float corners_z[3] = { A->coords->z, B->coords->z, C->coords->z };
+	// Copy corner data to local variables for faster access
+	float Ax = A->coords->x, Bx = B->coords->x, Cx = C->coords->x;
+	float Ay = A->coords->y, By = B->coords->y, Cy = C->coords->y;
+	float Az =A->coords->z, Bz = B->coords->z, Cz = C->coords->z;
+
 	unsigned int corners_color[3][4];
 	memcpy(corners_color[0], A->color, sizeof(A->color));
 	memcpy(corners_color[1], B->color, sizeof(B->color));
 	memcpy(corners_color[2], C->color, sizeof(C->color));
-	
-	// walk from min x value and per column calc the edges pixels, then color between them
-	for (float current_x = A->coords->x; current_x <= B->coords->x; current_x++) {
-		// get the edges of the triangle in this column
-		float AB_function = A->coords->y + AB_slope * (current_x - A->coords->x);
-		float AC_function = A->coords->y + AC_slope * (current_x - A->coords->x);
 
-		float y_coord_range[2];
-		if (AB_function <= AC_function) {
-			y_coord_range[0] = AB_function;
-			y_coord_range[1] = AC_function;
-		}
-		else {
-			y_coord_range[0] = AC_function;
-			y_coord_range[1] = AB_function;
-		}
-		for (float current_y = y_coord_range[0]; current_y <= y_coord_range[1]; current_y++) {
-			if (!_is_in_frame((int)current_x, (int)current_y, frame_width, frame_height))
-				continue;
-			float pixel_vec[2] = { current_x, current_y };
+	// Compute area for barycentric coordinates (area * 2). If zero, triangle is degenerate
+	const float triangle_area = (By - Cy) * (Ax - Cx) + (Cx - Bx) * (Ay - Cy);
+	if (triangle_area == 0.0f) {
+		free(sorted_points);
+		return;
+	}
+	const float inverse_triangle_area = 1.0f / triangle_area;
+
+	int half1_start_x = (int)floorf(glm_clamp(A->coords->x, 0.0, frame_width - 1));
+	int half1_end_x = (int)floorf(glm_clamp(B->coords->x, 0.0, frame_width - 1));
+	// walk columns from A.x to B.x (left half), and per column calc the edges pixels, then color between them
+	for (int current_x = half1_start_x; current_x <= half1_end_x; current_x++) {
+		// get the edges of the triangle in this column
+		float AB_function = A->coords->y + AB_slope * ((float)current_x - A->coords->x);
+		float AC_function = A->coords->y + AC_slope * ((float)current_x - A->coords->x);
+
+		int y_min = (int)floorf(glm_clamp(fminf(AB_function, AC_function), 0.0, frame_height - 1));
+		int y_max = (int)floorf(glm_clamp(fmaxf(AB_function, AC_function), 0.0, frame_height - 1));
+
+		for (int current_y = y_min; current_y <= y_max; current_y++) {
+			const float px = (float)current_x;
+			const float py = (float)current_y;
+
+			float A_weight = ((By - Cy) * (px - Cx) + (Cx - Bx) * (py - Cy)) * inverse_triangle_area;
+			float B_weight = ((Cy - Ay) * (px - Cx) + (Ax - Cx) * (py - Cy)) * inverse_triangle_area;
+			float C_weight = 1.0f - A_weight - B_weight;
 			
-			float* interpolation_weights = lin_interp2d(pixel_vec, corners_x, corners_y, CORNERS);
-			float pixel_distance = _interpolate_distance(interpolation_weights, corners_z, CORNERS);
-			if (pixel_distance < z_buffer[(int)current_y * frame_width + (int)current_x]) {
-				z_buffer[(int)current_y * frame_width + (int)current_x] = pixel_distance;
-				unsigned int* interpolated_color = _interpolate_color(interpolation_weights, corners_color);
-				_draw_pixel(frame, frame_width, frame_height, (int)current_x, (int)current_y, interpolated_color);
+			float pixel_distance = Az * A_weight + Bz * B_weight + Cz * C_weight;
+			int pixel_idx = current_y * frame_width + current_x;
+			if (pixel_distance < z_buffer[pixel_idx]) {
+				z_buffer[pixel_idx] = pixel_distance;
+
+				unsigned int interpolated_color[4];
+				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
+					float color_ingrediant = (float)corners_color[0][color_ingrediant_idx] * A_weight
+										   + (float)corners_color[1][color_ingrediant_idx] * B_weight
+										   + (float)corners_color[2][color_ingrediant_idx] * C_weight;
+					interpolated_color[color_ingrediant_idx] = (unsigned int)glm_clamp(color_ingrediant, 0.0f, 255.0f);
+				}
+				_draw_pixel(frame, frame_width, frame_height, (unsigned int)current_x, (unsigned int)current_y, interpolated_color);
 			}
 		}
 	}
 	// do the same from the mid x corner. (we can't continue the same becaue the first slope is irrelivant)
 	float BC_slope = (C->coords->y - B->coords->y) / (C->coords->x - B->coords->x);
-	for (float current_x = B->coords->x; current_x <= C->coords->x; current_x++) {
-		float BC_function = B->coords->y + BC_slope * (current_x - B->coords->x);
-		float AC_function = A->coords->y + AC_slope * (current_x - A->coords->x);
+	int half2_end_x = (int)floorf(glm_clamp(C->coords->x, 0.0, frame_width - 1));
 
-		float y_coord_range[2];
-		if (BC_function <= AC_function) {
-			y_coord_range[0] = BC_function;
-			y_coord_range[1] = AC_function;
-		}
-		else {
-			y_coord_range[0] = AC_function;
-			y_coord_range[1] = BC_function;
-		}
+	for (int current_x = half1_end_x; current_x <= half2_end_x; current_x++) {
+		float BC_function = B->coords->y + BC_slope * ((float)current_x - B->coords->x);
+		float AC_function = A->coords->y + AC_slope * ((float)current_x - A->coords->x);
 
-		for (float current_y = y_coord_range[0]; current_y <= y_coord_range[1]; current_y++) {
-			if (!_is_in_frame((int)current_x, (int)current_y, frame_width, frame_height))
-				continue;
-			float pixel_vec[2] = { current_x, current_y };
+		int y_min = (int)floorf(glm_clamp(fminf(BC_function, AC_function), 0.0, frame_height - 1));
+		int y_max = (int)floorf(glm_clamp(fmaxf(BC_function, AC_function), 0.0, frame_height - 1));
 
-			float* interpolation_weights = lin_interp2d(pixel_vec, corners_x, corners_y, 3);
-			float pixel_distance = _interpolate_distance(interpolation_weights, corners_z, CORNERS);
-			if (pixel_distance < z_buffer[(int)current_y * frame_width + (int)current_x]) {
-				z_buffer[(int)current_y * frame_width + (int)current_x] = pixel_distance;
-				unsigned int* interpolated_color = _interpolate_color(interpolation_weights, corners_color);
-				_draw_pixel(frame, frame_width, frame_height, (int)current_x, (int)current_y, interpolated_color);
+		for (int current_y = y_min; current_y <= y_max; current_y++) {
+			const float px = (float)current_x;
+			const float py = (float)current_y;
+
+			float A_weight = ((By - Cy) * (px - Cx) + (Cx - Bx) * (py - Cy)) * inverse_triangle_area;
+			float B_weight = ((Cy - Ay) * (px - Cx) + (Ax - Cx) * (py - Cy)) * inverse_triangle_area;
+			float C_weight = 1.0f - A_weight - B_weight;
+
+			float pixel_distance = Az * A_weight + Bz * B_weight + Cz * C_weight;
+			int pixel_idx = current_y * frame_width + current_x;
+			if (pixel_distance < z_buffer[pixel_idx]) {
+				z_buffer[pixel_idx] = pixel_distance;
+
+				unsigned int interpolated_color[4];
+				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
+					float color_ingrediant = (float)corners_color[0][color_ingrediant_idx] * A_weight
+										   + (float)corners_color[1][color_ingrediant_idx] * B_weight
+										   + (float)corners_color[2][color_ingrediant_idx] * C_weight;
+					interpolated_color[color_ingrediant_idx] = (unsigned int)glm_clamp(color_ingrediant, 0.0f, 255.0f);
+				}
+				_draw_pixel(frame, frame_width, frame_height, (unsigned int)current_x, (unsigned int)current_y, interpolated_color);
 			}
 		}
 	}
+	free(sorted_points);
 }
 
 Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
@@ -161,7 +188,6 @@ Point** _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c)
 			points_asc[2] = point_a;
 		}
 	}
-
 	return points_asc;
 }
 
@@ -174,7 +200,7 @@ unsigned int* _interpolate_color(float weights[3], unsigned int corners_color[3]
 
 	for (int color_ingredient_idx = 0; color_ingredient_idx < 4; color_ingredient_idx++) {
 		for (int corner_idx = 0; corner_idx < 3; corner_idx++) {
-			interpolated_color[color_ingredient_idx] = interpolated_color[color_ingredient_idx] + corners_color[corner_idx][color_ingredient_idx] * weights[corner_idx];
+			interpolated_color[color_ingredient_idx] += corners_color[corner_idx][color_ingredient_idx] * weights[corner_idx];
 		}
 	}
 	
