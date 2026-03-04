@@ -5,7 +5,7 @@
 
 
 void rasterize_objects_to_frame(uint32_t* frame, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
-	float* z_buffer = malloc(frame_width * frame_height * sizeof * z_buffer);
+	float* z_buffer = malloc(frame_width * frame_height * sizeof(z_buffer));
 	if (!z_buffer) {
 		SDL_LogError(1, "problem with allocating z_buffer");
 		return NULL;

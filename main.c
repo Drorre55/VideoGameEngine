@@ -102,9 +102,18 @@ void main() {
 		engine_status = load_world();
 	SDL_Log("loaded world");
 
+	Uint64 now = SDL_GetPerformanceCounter();
+	Uint64 last = 0;
+	double delta_time;
+	double fps;
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {
-			Uint64 current_tick = SDL_GetTicks();
+			last = now;
+			now = SDL_GetPerformanceCounter();
+			delta_time = (double)((now - last) / (double)SDL_GetPerformanceFrequency());
+			fps = 1.0 / delta_time;
+			SDL_Log("FPS: %f", fps);
+
 			engine_status = handle_input();
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
@@ -112,7 +121,6 @@ void main() {
 			engine_status = render();
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
-			SDL_Log("render time: %d", SDL_GetTicks() - current_tick);
 		}
 	}
 	

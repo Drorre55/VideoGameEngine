@@ -44,16 +44,18 @@ void cut_objects_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 
 unsigned int _count_points_inside_FOV(Triangle* triangle) {
 	unsigned int num_points_on_screen = 
-		_is_inside_FOV(triangle->corner1->coords) + 
-		_is_inside_FOV(triangle->corner2->coords) +
-		_is_inside_FOV(triangle->corner3->coords);
+		_is_inside_FOV(triangle->corner1->coords, 1.2) + 
+		_is_inside_FOV(triangle->corner2->coords, 1.2) +
+		_is_inside_FOV(triangle->corner3->coords, 1.2);
 	return num_points_on_screen;
 }
 
-unsigned int _is_inside_FOV(Vec3* coords)
+unsigned int _is_inside_FOV(Vec3* coords, float extended_bounds_percentage)
 {
-	unsigned int is_outside_x_range = coords->x < -1 || coords->x > 1;
-	unsigned int is_outside_y_range = coords->y < -1 || coords->y > 1;
+	float max_bound = 1.0f * extended_bounds_percentage;
+	float min_bound = -max_bound;
+	unsigned int is_outside_x_range = coords->x < min_bound || coords->x > max_bound;
+	unsigned int is_outside_y_range = coords->y < min_bound || coords->y > max_bound;
 	return !is_outside_x_range && !is_outside_y_range;
 }
 
