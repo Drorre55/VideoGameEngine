@@ -76,6 +76,7 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	int half1_start_x = (int)floorf(glm_clamp(Ax, 0.0, frame_width - 1));
 	int half1_end_x = (int)ceilf(glm_clamp(Bx, 0.0, frame_width - 1));
 	int half2_end_x = (int)ceilf(glm_clamp(Cx, 0.0, frame_width - 1));
+	if (half1_start_x == half2_end_x) return;
 
 	// Precompute slopes for edge stepping (used to compute column y-range)
 	float AB_slope = ABy / ABx;
@@ -86,6 +87,9 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	float AB_function = Ay + AB_slope * (half1_start_x - Ax);
 	float AC_function = Ay + AC_slope * (half1_start_x - Ax);
 	float BC_function = By + BC_slope * (half1_end_x - Bx);
+
+	float A_weight_y_step = -CBx * inverse_triangle_area;
+	float B_weight_y_step = -ACx * inverse_triangle_area;
 
 	float slope2 = AB_slope;
 	float edge_function2 = AB_function;
@@ -111,9 +115,7 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 			if (pixel_distance < z_buffer[pixel_idx]) {
 				z_buffer[pixel_idx] = pixel_distance;
 
-				unsigned int interpolated_color[4];
-				//float weights[3] = { A_weight, B_weight, C_weight };
-				//_interpolate_color(weights, corners_color , interpolated_color);
+				unsigned int interpolated_color[4];// = { 100, 100, 100, 255 };
 				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
 					float color_ingrediant = (float)corners_color[0][color_ingrediant_idx] * A_weight
 										   + (float)corners_color[1][color_ingrediant_idx] * B_weight
@@ -123,8 +125,8 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 				_draw_pixel(frame, frame_width, frame_height, (unsigned int)current_x, (unsigned int)current_y, interpolated_color);
 			}
 			// move y 1 unit up
-			A_weight -= CBx * inverse_triangle_area;
-			B_weight -= ACx * inverse_triangle_area;
+			A_weight += A_weight_y_step;
+			B_weight += B_weight_y_step;
 			C_weight = 1.0f - A_weight - B_weight;
 		}
 		// move x 1 unit right
