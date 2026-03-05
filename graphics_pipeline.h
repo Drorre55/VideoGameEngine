@@ -11,6 +11,7 @@ void move_camera_location(Vec3* direction, Camera* camera);
 
 void run_graphics_pipeline(
 	uint32_t* framebuffer, 
+	float* z_buffer,
 	WorldObjects* world_objects, 
 	Camera* camera, 
 	unsigned int frame_width, 

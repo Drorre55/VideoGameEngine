@@ -1,5 +1,5 @@
 #include "scale_to_FOV_transform.h"
-
+#define VIEW_FRUSTUM_MAX 10000.0f
 
 // convert coords from camera space to field of view space - x,y values scaled to [-1, 1], and z is the distance
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
@@ -18,7 +18,7 @@ void _transform_point_scale_to_FOV(Vec3* coords, Camera* camera)
 
 	coords->x /= tan(camera->field_of_view->x_degree_from_center) * coords->z;
 	coords->y /= tan(camera->field_of_view->y_degree_from_center) * coords->z;
-	coords->z = distance;
+	coords->z = (1.0f / distance - 1.0f / VIEW_FRUSTUM_MAX) / (1.0f - 1.0f / VIEW_FRUSTUM_MAX) ;
 }
 
 void cut_objects_completely_outside_FOV(WorldObjects* FOV_space_objects) {
@@ -56,7 +56,8 @@ unsigned int _is_inside_FOV(Vec3* coords, float extended_bounds_percentage)
 	float min_bound = -max_bound;
 	unsigned int is_outside_x_range = coords->x < min_bound || coords->x > max_bound;
 	unsigned int is_outside_y_range = coords->y < min_bound || coords->y > max_bound;
-	return !is_outside_x_range && !is_outside_y_range;
+	unsigned int is_outside_z_range = coords->z < 0.0f || coords->z > 1.0f;
+	return !is_outside_x_range && !is_outside_y_range && !is_outside_z_range;
 }
 
 void transform_xy_from_FOV_space_to_01_scale(WorldObjects* world_objects) {

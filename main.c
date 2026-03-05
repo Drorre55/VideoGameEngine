@@ -13,29 +13,36 @@ static SDL_Texture* texture = NULL;
 static SDL_Renderer* renderer = NULL;
 
 static uint32_t* framebuffer;
+float* z_buffer;
 static WorldObjects* worldObjects;
 static Camera* camera;
 
 SDL_AppResult initialize() {
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
-		SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
+		SDL_LogError(1, "Couldn't initialize SDL: %s", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
 
 	if (!SDL_CreateWindowAndRenderer("My game engine!!", WINDOW_WIDTH, WINDOW_HEIGHT, 0, &window, &renderer)) {
-		SDL_Log("Couldn't create window or renderer: %s", SDL_GetError());
+		SDL_LogError(1, "Couldn't create window or renderer: %s", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
 
 	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
 	if (!texture) {
-		SDL_Log("Couldn't create texture: %s", SDL_GetError());
+		SDL_LogError(1, "Couldn't create texture: %s", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
 
 	framebuffer = malloc(WINDOW_WIDTH * WINDOW_HEIGHT * sizeof * framebuffer);
 	if (!framebuffer) {
-		SDL_Log("problem with allocating framebuffer");
+		SDL_LogError(1, "problem with allocating framebuffer");
+		return SDL_APP_FAILURE;
+	}
+
+	z_buffer = malloc(WINDOW_WIDTH * WINDOW_HEIGHT * sizeof * z_buffer);
+	if (!z_buffer) {
+		SDL_LogError(1, "problem with allocating z_buffer");
 		return SDL_APP_FAILURE;
 	}
 
@@ -72,13 +79,14 @@ SDL_AppResult handle_input() {
 
 
 SDL_AppResult render() {
-	memset(framebuffer, 0x000000FF, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	memset(framebuffer, 0x00000000, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
 	for (int row = 0; row < WINDOW_HEIGHT; row++) {
 		for (int column = 0; column < WINDOW_WIDTH; column++) {
-			framebuffer[row * WINDOW_WIDTH + column] = rgba_to_uint32(0, 0, 255, 200);
+			// rgba_to_uint32(0, 0, 255, 200);
+			framebuffer[row * WINDOW_WIDTH + column] = (0 << 24) | (0 << 16) | (255 << 8) | 200;
 		}
 	}
-	run_graphics_pipeline(framebuffer, worldObjects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+	run_graphics_pipeline(framebuffer, z_buffer, worldObjects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
 
 	SDL_RenderClear(renderer);
