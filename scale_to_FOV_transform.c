@@ -1,5 +1,4 @@
 #include "scale_to_FOV_transform.h"
-#define VIEW_FRUSTUM_MAX 10000.0f
 
 // convert coords from camera space to field of view space - x,y values scaled to [-1, 1], and z is the distance
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {

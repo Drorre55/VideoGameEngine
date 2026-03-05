@@ -1,5 +1,7 @@
 #pragma once
 #include "world_objects.h"
+#define VIEW_FRUSTUM_MAX 1000.0f
+
 
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera);
 void _transform_point_scale_to_FOV(Vec3* coords, Camera* camera);
