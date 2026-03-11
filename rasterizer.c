@@ -128,12 +128,12 @@ void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, uint32_
 
 				uint32_t interpolated_color[4];
 				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
-					interpolated_color[color_ingrediant_idx] = (uint32_t)pixel_color_channel[color_ingrediant_idx];
+					interpolated_color[color_ingrediant_idx] = (uint32_t)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
 				}
 				// draw_pixel[pixel_idx] => rgba_to_uint32
 				frame[pixel_idx] = (interpolated_color[0] << 24) | (interpolated_color[1] << 16) | (interpolated_color[2] << 8) | interpolated_color[3];
 			}
-			// step one pixel down in y: update weights, depth and color using precomputed dy deltas
+			// step one pixel down: update weights, depth and color using precomputed dy deltas
 			A_weight += dA_dy;
 			B_weight += dB_dy;
 			pixel_distance += dz_dy;
