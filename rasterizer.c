@@ -4,55 +4,46 @@
 #define CORNERS 3
 
 
+void transform_to_pixel_space(WorldObjects* on_screen_objects, unsigned int frame_width, unsigned int frame_height)
+{
+	for (int i = 0; i < on_screen_objects->num_vertices; i++) {
+		vec3* vertex = on_screen_objects->vertices[i];
+		(*vertex)[0] = (*vertex)[0] * frame_width;
+		(*vertex)[1] = (*vertex)[1] * frame_height;
+	}
+}
+
 void rasterize_objects_to_frame(uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
 	memset(z_buffer, 0, frame_width * frame_height * sizeof(float));
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-		Triangle* current_triangle = on_screen_objects->triangle_objects[i];
-		
-		_transform_point_to_pixel_space(current_triangle->corner1->coords, frame_width, frame_height);
-		_transform_point_to_pixel_space(current_triangle->corner2->coords, frame_width, frame_height);
-		_transform_point_to_pixel_space(current_triangle->corner3->coords, frame_width, frame_height);
-		
-		_draw_triangle(current_triangle, frame, z_buffer, frame_width, frame_height);
-
-		free(current_triangle->corner1->coords);
-		free(current_triangle->corner1);
-		free(current_triangle->corner2->coords);
-		free(current_triangle->corner2);
-		free(current_triangle->corner3->coords);
-		free(current_triangle->corner3);
-
+		Triangle* current_triangle = on_screen_objects->triangles[i];
+		_draw_triangle(current_triangle, on_screen_objects->vertices, on_screen_objects->colors, frame, z_buffer, frame_width, frame_height);
 		free(current_triangle);
 	}
-	free(on_screen_objects->triangle_objects);
+	// TODO: free all vertices and colors
+	free(on_screen_objects->triangles);
 	free(on_screen_objects);
 }
 
-void _transform_point_to_pixel_space(Vec3* coords, unsigned int frame_width, unsigned int frame_height)
+void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
 {
-	coords->x = coords->x * frame_width;
-	coords->y = coords->y * frame_height;
-}
-
-void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
-{
-	Point* sorted_points[3];
-	_sort_points_by_x(triangle->corner1, triangle->corner2, triangle->corner3, sorted_points);
+	Triangle sorted_triangle;
+	_sort_points_by_x(triangle, &sorted_triangle, vertices);
 	
-	Point* A = sorted_points[0];
-	Point* B = sorted_points[1];
-	Point* C = sorted_points[2];
+	vec3* A = vertices[sorted_triangle.corner1_idx];
+	vec3* B = vertices[sorted_triangle.corner2_idx];
+	vec3* C = vertices[sorted_triangle.corner3_idx];
 
 	// Copy corner data to local variables for faster access
-	float Ax = A->coords->x, Bx = B->coords->x, Cx = C->coords->x;
-	float Ay = A->coords->y, By = B->coords->y, Cy = C->coords->y;
-	float Az =A->coords->z, Bz = B->coords->z, Cz = C->coords->z;
+	float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
+	float Ay = (*A)[1], By = (*B)[1], Cy = (*C)[1];
+	float Az = (*A)[2], Bz = (*B)[2], Cz = (*C)[2];
 	
 	unsigned int corners_color[3][4];
-	memcpy(corners_color[0], A->color, sizeof(A->color));
-	memcpy(corners_color[1], B->color, sizeof(B->color));
-	memcpy(corners_color[2], C->color, sizeof(C->color));
+	memcpy(corners_color[0], colors[sorted_triangle.corner1_idx], sizeof(Color));
+	memcpy(corners_color[1], colors[sorted_triangle.corner2_idx], sizeof(Color));
+	memcpy(corners_color[2], colors[sorted_triangle.corner3_idx], sizeof(Color));
 
 	// Precompute edges
 	float ABx = Bx - Ax, ABy = By - Ay;
@@ -156,47 +147,45 @@ void _draw_triangle(Triangle* triangle, uint32_t* frame, float* z_buffer, unsign
 	}
 }
 
-void _sort_points_by_x(Point* point_a, Point* point_b, Point* point_c, Point* dest[3])
+void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3** vertices)
 {
-	/*Point** dest = (Point**)malloc(3 * sizeof(Point*));
-	if (dest == NULL) {
-		SDL_LogError(1, "problem with malloc. can't sort points");
-		return NULL;
-	}*/
+	vec3* vertex_a = vertices[triangle->corner1_idx];
+	vec3* vertex_b = vertices[triangle->corner2_idx];
+	vec3* vertex_c = vertices[triangle->corner3_idx];
 
-	if (point_a->coords->x <= point_b->coords->x &&
-		point_a->coords->x <= point_c->coords->x) {
-		dest[0] = point_a;
-		if (point_b->coords->x <= point_c->coords->x) {
-			dest[1] = point_b;
-			dest[2] = point_c;
+	if ((*vertex_a)[0] <= (*vertex_b)[0] &&
+		(*vertex_a)[0] <= (*vertex_c)[0]) {
+		dest->corner1_idx = triangle->corner1_idx;
+		if ((*vertex_b)[0] <= (*vertex_c)[0]) {
+			dest->corner2_idx = triangle->corner2_idx;
+			dest->corner3_idx = triangle->corner3_idx;
 		}
 		else {
-			dest[1] = point_c;
-			dest[2] = point_b;
+			dest->corner2_idx = triangle->corner3_idx;
+			dest->corner3_idx = triangle->corner2_idx;
 		}
 	}
-	else if (point_b->coords->x <= point_a->coords->x &&
-		point_b->coords->x <= point_c->coords->x) {
-		dest[0] = point_b;
-		if (point_a->coords->x <= point_c->coords->x) {
-			dest[1] = point_a;
-			dest[2] = point_c;
+	else if ((*vertex_b)[0] <= (*vertex_a)[0] &&
+		(*vertex_b)[0] <= (*vertex_c)[0]) {
+		dest->corner1_idx = triangle->corner2_idx;
+		if ((*vertex_a)[0] <= (*vertex_c)[0]) {
+			dest->corner2_idx = triangle->corner1_idx;
+			dest->corner3_idx = triangle->corner3_idx;
 		}
 		else {
-			dest[1] = point_c;
-			dest[2] = point_a;
+			dest->corner2_idx = triangle->corner3_idx;
+			dest->corner3_idx = triangle->corner1_idx;
 		}
 	}
 	else {
-		dest[0] = point_c;
-		if (point_a->coords->x <= point_b->coords->x) {
-			dest[1] = point_a;
-			dest[2] = point_b;
+		dest->corner1_idx = triangle->corner3_idx;
+		if ((*vertex_a)[0] <= (*vertex_b)[0]) {
+			dest->corner2_idx = triangle->corner1_idx;
+			dest->corner3_idx = triangle->corner2_idx;
 		}
 		else {
-			dest[1] = point_b;
-			dest[2] = point_a;
+			dest->corner2_idx = triangle->corner2_idx;
+			dest->corner3_idx = triangle->corner1_idx;
 		}
 	}
 }

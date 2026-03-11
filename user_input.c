@@ -30,9 +30,9 @@ SDL_AppResult user_events(Camera* camera, unsigned int window_width, unsigned in
 
 /* returns 1 if moving forward with this keypress, -1 if moving backward, 0 if not moving. 
    it sees all keys that are pressed and cancels each other out if they're on contradicting directions. */
-Vec3* direction_user_should_move()
+vec3* direction_user_should_move()
 {
-	Vec3* direction = (Vec3*)calloc(1, sizeof(Vec3));
+	vec3* direction = (vec3*)calloc(1, sizeof(vec3));
 	if (direction == NULL) {
 		SDL_LogError(1, "problem with calloc. can't get direction user should move");
 		return NULL;
@@ -41,14 +41,14 @@ Vec3* direction_user_should_move()
 	const bool* key_states = SDL_GetKeyboardState(NULL);
 
 	if (key_states[SDL_SCANCODE_W])
-		direction->z += 1;
+		(*direction)[2] += 1;
 	if (key_states[SDL_SCANCODE_S])
-		direction->z -= 1;
+		(*direction)[2] -= 1;
 
 	if (key_states[SDL_SCANCODE_D])
-		direction->x += 1;
+		(*direction)[0] += 1;
 	if (key_states[SDL_SCANCODE_A])
-		direction->x -= 1;
+		(*direction)[0] -= 1;
 	
 	// TODO: add jump on y axis
 	return direction;

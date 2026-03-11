@@ -3,4 +3,4 @@
 #include "world_objects.h"
 
 SDL_AppResult user_events(Camera* camera, unsigned int window_width, unsigned int window_height);
-Vec3* direction_user_should_move();
+vec3* direction_user_should_move();

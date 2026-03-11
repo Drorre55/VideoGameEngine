@@ -7,7 +7,7 @@
 
 
 void move_camera_direction(float relative_x, float relative_y, Camera* camera, unsigned int window_width, unsigned int window_height);
-void move_camera_location(Vec3* direction, Camera* camera);
+void move_camera_location(vec3 direction, Camera* camera);
 
 void run_graphics_pipeline(
 	uint32_t* framebuffer, 
