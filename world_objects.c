@@ -2,75 +2,6 @@
 #include <math.h>
 
 
-Camera* load_camera(unsigned int window_width, unsigned int window_height) {
-	Camera* camera = calloc(1, sizeof(Camera));
-	if (camera == NULL) {
-		SDL_Log("problem with malloc. can't load camera");
-		return NULL;
-	}
-
-	vec3* cam_point = (vec3*)calloc(1, sizeof(vec3));
-	if (cam_point == NULL) {
-		SDL_Log("Problem with malloc. can't load camera");
-		free(camera);
-		return NULL;
-	}
-	camera->global_coords = cam_point;
-
-	vec3* x_direction = (vec3*)calloc(1, sizeof(vec3));
-	if (x_direction == NULL) {
-		SDL_Log("Problem with malloc. can't load camera");
-		free(cam_point);
-		free(camera);
-		return NULL;
-	}
-	camera->x_direction_vector = x_direction;
-	(*camera->x_direction_vector)[0] = -1.0;
-	
-	vec3* y_direction = (vec3*)calloc(1, sizeof(vec3));
-	if (y_direction == NULL) {
-		SDL_Log("Problem with malloc. can't load camera");
-		free(x_direction);
-		free(cam_point);
-		free(camera);
-		return NULL;
-	}
-	camera->y_direction_vector = y_direction;
-	(*camera->y_direction_vector)[1] = -1.0;
-
-	vec3* z_direction = (vec3*)calloc(1, sizeof(vec3));
-	if (z_direction == NULL) {
-		SDL_Log("Problem with malloc. can't load camera");
-		free(cam_point);
-		free(camera);
-		return NULL;
-	}
-	camera->z_direction_vector = z_direction;
-	(*camera->z_direction_vector)[2] = 1.0;
-
-	FOV* field_of_view = malloc(sizeof(FOV));
-	if (field_of_view == NULL) {
-		SDL_Log("Problem with malloc. can't load camera");
-		free(cam_point);
-		free(camera);
-		return NULL;
-	}
-	camera->field_of_view = field_of_view;
-	camera->field_of_view->x_degree_from_center = M_PI * (FOV_CHOSEN / 180.0) / 2.0; 
-	camera->field_of_view->y_degree_from_center = M_PI * ((float)window_height / (float)window_width) * (FOV_CHOSEN / 180.0) / 2.0;
-	return camera;
-}
-
-void free_camera(Camera* camera)
-{
-	free(camera->field_of_view);
-	free(camera->global_coords);
-	free(camera->x_direction_vector);
-	free(camera->y_direction_vector);
-	free(camera->z_direction_vector);
-	free(camera);
-}
-
 WorldObjects* load_world_objects() {
 	WorldObjects* world_objects = (WorldObjects*)calloc(1, sizeof(WorldObjects));
 	if (world_objects == NULL) {
@@ -366,24 +297,24 @@ WorldObjects* world_objects_deep_copy(WorldObjects* world_objects)
 {
 	WorldObjects* objects_cpy = (WorldObjects*)malloc(sizeof(WorldObjects));
 	if (objects_cpy == NULL) {
-		SDL_Log("problem with malloc. can't load world objects");
+		SDL_Log("problem with malloc. can't copy world_objects");
 		return NULL;
 	}
 	vec3** vertices_cpy = (vec3**)malloc(sizeof(vec3*) * world_objects->num_vertices);
 	if (vertices_cpy == NULL) {
-		SDL_LogError(1, "Problem with realloc. can't add vertices");
+		SDL_LogError(1, "Problem with realloc. can't copy world_objects");
 		free(objects_cpy);
 		return NULL;
 	}
 	Color** colors_cpy = (Color**)malloc(sizeof(Color*) * world_objects->num_vertices);
 	if (colors_cpy == NULL) {
-		SDL_LogError(1, "Problem with realloc. can't add vertices");
+		SDL_LogError(1, "Problem with realloc. can't copy world_objects");
 		free(objects_cpy);
 		return NULL;
 	}
 	Triangle** triangles_cpy = (Triangle**)malloc(sizeof(Triangle*) * world_objects->num_triangles);
 	if (triangles_cpy == NULL) {
-		SDL_LogError(1, "Problem with realloc. can't add vertices");
+		SDL_LogError(1, "Problem with realloc. can't copy world_objects");
 		free(objects_cpy);
 		return NULL;
 	}
@@ -391,7 +322,7 @@ WorldObjects* world_objects_deep_copy(WorldObjects* world_objects)
 	for (int i = 0; i < world_objects->num_vertices; i++) {
 		vec3* vertex_cpy = (vec3*)(malloc(sizeof(vec3)));
 		if (vertex_cpy == NULL) {
-			SDL_LogError(1, "Problem with malloc. can't transform to camera space");
+			SDL_LogError(1, "Problem with malloc. can't copy world_objects");
 			free(vertices_cpy);
 			free(triangles_cpy);
 			free(colors_cpy);
@@ -404,7 +335,7 @@ WorldObjects* world_objects_deep_copy(WorldObjects* world_objects)
 	for (int i = 0; i < world_objects->num_vertices; i++) {
 		Color* color_cpy = (Color*)(malloc(sizeof(Color)));
 		if (color_cpy == NULL) {
-			SDL_LogError(1, "Problem with malloc. can't transform to camera space");
+			SDL_LogError(1, "Problem with malloc. can't copy world_objects");
 			free(vertices_cpy);
 			free(triangles_cpy);
 			free(colors_cpy);
@@ -417,7 +348,7 @@ WorldObjects* world_objects_deep_copy(WorldObjects* world_objects)
 	for (int j = 0; j < world_objects->num_triangles; j++) {
 		Triangle* triangle_cpy = (Triangle*)(malloc(sizeof(Triangle)));
 		if (triangle_cpy == NULL) {
-			SDL_LogError(1, "Problem with malloc. can't transform to camera space");
+			SDL_LogError(1, "Problem with malloc. can't copy world_objects");
 			free(vertices_cpy);
 			free(triangles_cpy);
 			free(colors_cpy);

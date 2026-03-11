@@ -45,6 +45,9 @@
     <ClCompile Include="user_input.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="camera.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -66,6 +69,9 @@
       <Filter>Header Files\Render Pipeline</Filter>
     </ClInclude>
     <ClInclude Include="user_input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

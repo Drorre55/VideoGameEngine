@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="camera.c" />
     <ClCompile Include="camera_space_transform.c" />
     <ClCompile Include="graphics_pipeline.c" />
     <ClCompile Include="main.c" />
@@ -141,6 +142,7 @@
     <ClCompile Include="world_objects.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="camera.h" />
     <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="user_input.h" />
     <ClInclude Include="world_objects.h" />
