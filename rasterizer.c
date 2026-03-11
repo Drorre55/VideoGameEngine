@@ -19,11 +19,8 @@ void rasterize_objects_to_frame(uint32_t* frame, float* z_buffer, unsigned int f
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
 		Triangle* current_triangle = on_screen_objects->triangles[i];
 		_draw_triangle(current_triangle, on_screen_objects->vertices, on_screen_objects->colors, frame, z_buffer, frame_width, frame_height);
-		free(current_triangle);
 	}
-	// TODO: free all vertices and colors
-	free(on_screen_objects->triangles);
-	free(on_screen_objects);
+	free_world_objects(on_screen_objects);
 }
 
 void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)

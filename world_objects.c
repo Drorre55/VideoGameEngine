@@ -61,6 +61,16 @@ Camera* load_camera(unsigned int window_width, unsigned int window_height) {
 	return camera;
 }
 
+void free_camera(Camera* camera)
+{
+	free(camera->field_of_view);
+	free(camera->global_coords);
+	free(camera->x_direction_vector);
+	free(camera->y_direction_vector);
+	free(camera->z_direction_vector);
+	free(camera);
+}
+
 WorldObjects* load_world_objects() {
 	WorldObjects* world_objects = (WorldObjects*)calloc(1, sizeof(WorldObjects));
 	if (world_objects == NULL) {
@@ -70,7 +80,7 @@ WorldObjects* load_world_objects() {
 	vec3** vertices = (vec3**)malloc(sizeof(vec3*) * 3);
 	if (vertices == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->vertices = vertices;
@@ -78,7 +88,7 @@ WorldObjects* load_world_objects() {
 	Color** colors = (Color**)malloc(sizeof(Color*) * 3);
 	if (colors == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->colors = colors;
@@ -86,7 +96,7 @@ WorldObjects* load_world_objects() {
 	Triangle** triangles = (Triangle**)malloc(sizeof(Triangle*));
 	if (triangles == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->triangles = triangles;
@@ -95,14 +105,14 @@ WorldObjects* load_world_objects() {
 	Color* point_a_color = (Color*)malloc(sizeof(Color));
 	if (point_a_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_a_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_a_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
 		free(point_a_color);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_a_color->r = 0;
@@ -116,19 +126,19 @@ WorldObjects* load_world_objects() {
 	Color* point_b_color = (Color*)malloc(sizeof(Color));
 	if (point_b_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
 		free(point_a_color);
-		free(world_objects);
+		free(point_a_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_b_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_b_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
 		free(point_a_color);
-		free(point_b_coords);
+		free(point_a_coords);
 		free(point_b_color);
-		free(world_objects);
+		free(point_b_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_b_color->r = 0;
@@ -142,22 +152,22 @@ WorldObjects* load_world_objects() {
 	Color* point_c_color = (Color*)malloc(sizeof(Color));
 	if (point_c_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
 		free(point_a_color);
-		free(point_b_coords);
+		free(point_a_coords);
 		free(point_b_color);
-		free(world_objects);
+		free(point_b_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_c_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_c_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
 		free(point_a_color);
-		free(point_b_coords);
+		free(point_a_coords);
 		free(point_b_color);
+		free(point_b_coords);
 		free(point_c_color);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_c_color->r = 255;
@@ -171,13 +181,13 @@ WorldObjects* load_world_objects() {
 	Triangle* triangle = (Triangle*)malloc(sizeof(Triangle));
 	if (triangle == NULL) {
 		SDL_Log("Problem with malloc. can't store point objects");
-		free(point_a_coords);
 		free(point_a_color);
-		free(point_b_coords);
+		free(point_a_coords);
 		free(point_b_color);
-		free(point_c_coords);
+		free(point_b_coords);
 		free(point_c_color);
-		free(world_objects);
+		free(point_c_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	triangle->corner1_idx = world_objects->num_vertices++;
@@ -197,28 +207,14 @@ WorldObjects* load_world_objects() {
 	Color* point_a1_color = (Color*)malloc(sizeof(Color));
 	if (point_a1_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_a1_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_a1_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
 		free(point_a1_color);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_a1_color->r = 255;
@@ -232,33 +228,18 @@ WorldObjects* load_world_objects() {
 	Color* point_b1_color = (Color*)malloc(sizeof(Color));
 	if (point_b1_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_color); 
-		free(world_objects);
+		free(point_a1_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_b1_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_b1_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_b1_color->r = 255;
@@ -272,36 +253,22 @@ WorldObjects* load_world_objects() {
 	Color* point_c1_color = (Color*)malloc(sizeof(Color));
 	if (point_c1_color == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(world_objects);
+		free(point_b1_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	vec3* point_c1_coords = (vec3*)malloc(sizeof(vec3));
 	if (point_c1_coords == NULL) {
 		SDL_Log("Problem with malloc. can't load world objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
+		free(point_b1_coords);
 		free(point_c1_color);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	point_c1_color->r = 255;
@@ -315,20 +282,13 @@ WorldObjects* load_world_objects() {
 	Triangle* triangle1 = (Triangle*)malloc(sizeof(Triangle));
 	if (triangle1 == NULL) {
 		SDL_Log("Problem with malloc. can't store point objects");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(point_c1_coords);
+		free(point_b1_coords);
 		free(point_c1_color);
-		free(world_objects);
+		free(point_c1_coords);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	triangle1->corner1_idx = world_objects->num_vertices++;
@@ -338,21 +298,14 @@ WorldObjects* load_world_objects() {
 	vec3** temp_vertices1 = (vec3**)realloc(world_objects->vertices, world_objects->num_vertices * sizeof * temp_vertices1);
 	if (temp_vertices1 == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(point_c1_coords);
+		free(point_b1_coords);
 		free(point_c1_color);
+		free(point_c1_coords);
 		free(triangle1);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->vertices = temp_vertices1;
@@ -363,21 +316,14 @@ WorldObjects* load_world_objects() {
 	Color** temp_colors1 = (Color**)realloc(world_objects->colors, world_objects->num_vertices * sizeof * temp_colors1);
 	if (temp_colors1 == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(point_c1_coords);
+		free(point_b1_coords);
 		free(point_c1_color);
+		free(point_c1_coords);
 		free(triangle1);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->colors = temp_colors1;
@@ -388,27 +334,32 @@ WorldObjects* load_world_objects() {
 	Triangle** temp_triangles1 = (Triangle**)realloc(world_objects->triangles, (world_objects->num_triangles + 1) * sizeof * temp_triangles1);
 	if (temp_triangles1 == NULL) {
 		SDL_LogError(1, "Problem with realloc. can't add vertices");
-		free(point_a_coords);
-		free(point_a_color);
-		free(point_b_coords);
-		free(point_b_color);
-		free(point_c_coords);
-		free(point_c_color);
-		free(triangle);
-		free(point_a1_coords);
 		free(point_a1_color);
-		free(point_b1_coords);
+		free(point_a1_coords);
 		free(point_b1_color);
-		free(point_c1_coords);
+		free(point_b1_coords);
 		free(point_c1_color);
+		free(point_c1_coords);
 		free(triangle1);
-		free(world_objects);
+		free_world_objects(world_objects);
 		return NULL;
 	}
 	world_objects->triangles = temp_triangles1;
 	world_objects->triangles[world_objects->num_triangles++] = triangle1;
 
 	return world_objects;
+}
+
+void free_world_objects(WorldObjects* world_objects)
+{
+	for (int i = 0; i < world_objects->num_vertices; i++) {
+		free(world_objects->vertices[i]);
+		free(world_objects->colors[i]);
+	}
+	for (int j = 0; j < world_objects->num_triangles; j++) {
+		free(world_objects->triangles[j]);
+	}
+	free(world_objects);
 }
 
 WorldObjects* world_objects_deep_copy(WorldObjects* world_objects)

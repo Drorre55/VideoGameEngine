@@ -53,6 +53,11 @@ SDL_AppResult shutdown() {
 	SDL_DestroyTexture(texture);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
+	
+	free(framebuffer);
+	free(z_buffer);
+	free_world_objects(world_objects);
+	free_camera(camera);
 
 	SDL_Quit();
 	return SDL_APP_SUCCESS;

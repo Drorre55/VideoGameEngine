@@ -9,15 +9,6 @@
 #define FOV_CHOSEN 90
 
 typedef struct {
-	float x, y, z;
-} Vec3;
-
-//typedef struct {
-//	Vec3* coords;
-//	unsigned int color[4];
-//} Point;
-
-typedef struct {
 	unsigned int r, g, b, a;
 } Color;
 
@@ -49,5 +40,7 @@ typedef struct {
 } Camera;
 
 Camera* load_camera(unsigned int window_width, unsigned int window_height);
+void free_camera(Camera* camera);
 WorldObjects* load_world_objects();
+void free_world_objects(WorldObjects* world_objects);
 WorldObjects* world_objects_deep_copy(WorldObjects* world_objects);
