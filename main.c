@@ -17,6 +17,9 @@ float* z_buffer;
 static WorldObjects* world_objects;
 static Camera* camera;
 
+bool show_fps;
+
+
 SDL_AppResult initialize() {
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		SDL_LogError(1, "Couldn't initialize SDL: %s", SDL_GetError());
@@ -46,6 +49,11 @@ SDL_AppResult initialize() {
 		return SDL_APP_FAILURE;
 	}
 
+	// Set text color to bright green for the FPS counter
+	SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+	SDL_RenderDebugText(renderer, 0.0f, 0.0f, " ");
+	show_fps = 0;
+
 	return SDL_APP_CONTINUE;
 }
 
@@ -73,7 +81,7 @@ SDL_AppResult load_world() {
 SDL_AppResult handle_input() {
 	SDL_AppResult app_result;
 
-	app_result = user_events(camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+	app_result = user_events(camera, &show_fps, WINDOW_WIDTH, WINDOW_HEIGHT);
 	if (app_result != SDL_APP_CONTINUE)
 		return app_result;
 	
@@ -83,7 +91,7 @@ SDL_AppResult handle_input() {
 }
 
 
-SDL_AppResult render() {
+SDL_AppResult render(int fps) {
 	memset(framebuffer, 0x00000000, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
 	for (int row = 0; row < WINDOW_HEIGHT; row++) {
 		for (int column = 0; column < WINDOW_WIDTH; column++) {
@@ -97,6 +105,17 @@ SDL_AppResult render() {
 	SDL_RenderClear(renderer);
 
 	SDL_RenderTexture(renderer, texture, NULL, NULL);
+
+	if (show_fps) {
+		// Scale up the tiny 8x8 debug font for better visibility
+		SDL_SetRenderScale(renderer, 2.0f, 2.0f);
+
+		// Render text at coordinates (x=10, y=10)
+		SDL_RenderDebugTextFormat(renderer, 10.0f, 10.0f, "FPS: %d", fps);
+
+		// Reset scale for the rest of your game rendering
+		SDL_SetRenderScale(renderer, 1.0f, 1.0f);
+	}
 
 	SDL_RenderPresent(renderer);
 
@@ -115,23 +134,24 @@ void main() {
 		engine_status = load_world();
 	SDL_Log("loaded world");
 
-	Uint64 now = SDL_GetPerformanceCounter();
-	Uint64 last = 0;
-	double delta_time;
-	double fps;
+	Uint64 last_time = SDL_GetTicks();
+	int frames = 0;
+	int fps = 0;
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {
-			last = now;
-			now = SDL_GetPerformanceCounter();
-			delta_time = (double)((now - last) / (double)SDL_GetPerformanceFrequency());
-			fps = 1.0 / delta_time;
-			SDL_Log("FPS: %f", fps);
+			Uint64 current_time = SDL_GetTicks();
+			frames++;
+			if (current_time > last_time + 1000) {
+				fps = frames;
+				frames = 0;
+				last_time = current_time;
+			}
 
 			engine_status = handle_input();
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
 
-			engine_status = render();
+			engine_status = render(fps);
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
 		}

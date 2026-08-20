@@ -2,7 +2,7 @@
 #include "graphics_pipeline.h"
 
 
-SDL_AppResult user_events(Camera* camera, unsigned int window_width, unsigned int window_height)
+SDL_AppResult user_events(Camera* camera, bool* show_fps, unsigned int window_width, unsigned int window_height)
 {
 	SDL_Event event;
 
@@ -23,6 +23,10 @@ SDL_AppResult user_events(Camera* camera, unsigned int window_width, unsigned in
 			/* BUG: SDL dosn't recognise wheel movment correctly
 			case SDL_EVENT_MOUSE_WHEEL:
 				move_camera_location(camera, event.wheel.integer_y);*/
+		case SDL_EVENT_KEY_DOWN:
+			if (event.key.key == SDLK_P && (event.key.mod & SDL_KMOD_CTRL)) {
+				*show_fps = !*show_fps;
+			}
 		}
 	}
 	return SDL_APP_CONTINUE;
