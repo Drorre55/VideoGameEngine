@@ -3,7 +3,7 @@
 
 
 typedef struct {
-	unsigned int r, g, b, a;
+	Uint8 r, g, b, a;
 } Color;
 
 typedef struct {
