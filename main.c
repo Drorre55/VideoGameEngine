@@ -12,7 +12,7 @@ static SDL_Window* window = NULL;
 static SDL_Texture* texture = NULL;
 static SDL_Renderer* renderer = NULL;
 
-static uint32_t* framebuffer;
+static Uint32* framebuffer;
 float* z_buffer;
 static WorldObjects* world_objects;
 static Camera* camera;
@@ -92,7 +92,7 @@ SDL_AppResult handle_input() {
 
 
 SDL_AppResult render(int fps) {
-	memset(framebuffer, 0x00000000, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(uint32_t));
+	memset(framebuffer, 0x00000000, WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(Uint32));
 	for (int row = 0; row < WINDOW_HEIGHT; row++) {
 		for (int column = 0; column < WINDOW_WIDTH; column++) {
 			// rgba_to_uint32(0, 0, 255, 200);
@@ -100,7 +100,7 @@ SDL_AppResult render(int fps) {
 		}
 	}
 	run_graphics_pipeline(framebuffer, z_buffer, world_objects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
-	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(uint32_t));
+	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(Uint32));
 
 	SDL_RenderClear(renderer);
 

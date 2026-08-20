@@ -2,7 +2,7 @@
 #include "graphics_pipeline.h"
 
 
-void run_graphics_pipeline(uint32_t* framebuffer, float* z_buffer, WorldObjects* world_objects, Camera* camera, 
+void run_graphics_pipeline(Uint32* framebuffer, float* z_buffer, WorldObjects* world_objects, Camera* camera, 
 	unsigned int frame_width, unsigned int frame_height)
 {
 	WorldObjects* camera_space_objects = transform_from_world_to_camera_space(world_objects, camera);

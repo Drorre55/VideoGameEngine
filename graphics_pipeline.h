@@ -7,7 +7,7 @@
 
 
 void run_graphics_pipeline(
-	uint32_t* framebuffer, 
+	Uint32* framebuffer, 
 	float* z_buffer,
 	WorldObjects* world_objects, 
 	Camera* camera, 

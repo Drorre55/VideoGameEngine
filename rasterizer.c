@@ -13,7 +13,7 @@ void transform_to_pixel_space(WorldObjects* on_screen_objects, unsigned int fram
 	}
 }
 
-void rasterize_objects_to_frame(uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
+void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
 	memset(z_buffer, 0, frame_width * frame_height * sizeof(float));
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
@@ -23,7 +23,7 @@ void rasterize_objects_to_frame(uint32_t* frame, float* z_buffer, unsigned int f
 	free_world_objects(on_screen_objects);
 }
 
-void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, uint32_t* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
+void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
 {
 	Triangle sorted_triangle;
 	_sort_points_by_x(triangle, &sorted_triangle, vertices);
@@ -123,9 +123,9 @@ void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, uint32_
 			if (pixel_distance > z_buffer[pixel_idx]) {
 				z_buffer[pixel_idx] = pixel_distance;
 
-				uint32_t interpolated_color[4];
+				Uint32 interpolated_color[4];
 				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
-					interpolated_color[color_ingrediant_idx] = (uint32_t)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
+					interpolated_color[color_ingrediant_idx] = (Uint32)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
 				}
 				// draw_pixel[pixel_idx] => rgba_to_uint32
 				frame[pixel_idx] = (interpolated_color[0] << 24) | (interpolated_color[1] << 16) | (interpolated_color[2] << 8) | interpolated_color[3];
@@ -187,7 +187,7 @@ void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3** vertices)
 	}
 }
 
-void _draw_pixel(uint32_t* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, unsigned int* color)
+void _draw_pixel(Uint32* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, unsigned int* color)
 {
 	if (!_is_in_frame(x, y, frame_width, frame_height))
 		return;
