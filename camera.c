@@ -1,7 +1,7 @@
 #include "camera.h"
 
 
-Camera* load_camera(unsigned int window_width, unsigned int window_height) {
+Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 	Camera* camera = calloc(1, sizeof(Camera));
 	if (camera == NULL) {
 		SDL_Log("problem with malloc. can't load camera");
@@ -70,7 +70,7 @@ void free_camera(Camera* camera)
 	free(camera);
 }
 
-void move_camera_direction(float relative_x, float relative_y, Camera* camera, unsigned int window_width, unsigned int window_height) {
+void move_camera_direction(float relative_x, float relative_y, Camera* camera, Uint32 window_width, Uint32 window_height) {
 	// In the future if I will add Screw rotation than add rotate z_axis
 	float rotation_degree_x = -relative_x / window_width * (camera->field_of_view->x_degree_from_center * 2);
 	rotate_y_axis(*camera->x_direction_vector, rotation_degree_x);

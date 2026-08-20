@@ -4,7 +4,7 @@
 #define CORNERS 3
 
 
-void transform_to_pixel_space(WorldObjects* on_screen_objects, unsigned int frame_width, unsigned int frame_height)
+void transform_to_pixel_space(WorldObjects* on_screen_objects, Uint32 frame_width, Uint32 frame_height)
 {
 	for (int i = 0; i < on_screen_objects->num_vertices; i++) {
 		vec3* vertex = on_screen_objects->vertices[i];
@@ -13,7 +13,7 @@ void transform_to_pixel_space(WorldObjects* on_screen_objects, unsigned int fram
 	}
 }
 
-void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height, WorldObjects* on_screen_objects) {
+void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height, WorldObjects* on_screen_objects) {
 	memset(z_buffer, 0, frame_width * frame_height * sizeof(float));
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
@@ -23,7 +23,7 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, unsigned int fra
 	free_world_objects(on_screen_objects);
 }
 
-void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32* frame, float* z_buffer, unsigned int frame_width, unsigned int frame_height)
+void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
 	Triangle sorted_triangle;
 	_sort_points_by_x(triangle, &sorted_triangle, vertices);
@@ -187,14 +187,14 @@ void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3** vertices)
 	}
 }
 
-void _draw_pixel(Uint32* frame, unsigned int frame_width, unsigned int frame_height, unsigned int x, unsigned int y, unsigned int* color)
+void _draw_pixel(Uint32* frame, Uint32 frame_width, Uint32 frame_height, Uint32 x, Uint32 y, Uint32* color)
 {
 	if (!_is_in_frame(x, y, frame_width, frame_height))
 		return;
 	frame[y * frame_width + x] = rgba_to_uint32(color[0], color[1], color[2], color[3]);
 }
 
-unsigned int _is_in_frame(unsigned int x, unsigned int y, unsigned int frame_width, unsigned int frame_height)
+Uint32 _is_in_frame(Uint32 x, Uint32 y, Uint32 frame_width, Uint32 frame_height)
 {
 	return !(x < 0 || x >= frame_width || y < 0 || y >= frame_height);
 }

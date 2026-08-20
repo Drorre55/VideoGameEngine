@@ -11,6 +11,6 @@ void run_graphics_pipeline(
 	float* z_buffer,
 	WorldObjects* world_objects, 
 	Camera* camera, 
-	unsigned int frame_width, 
-	unsigned int frame_height
+	Uint32 frame_width, 
+	Uint32 frame_height
 );

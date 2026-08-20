@@ -23,7 +23,7 @@ typedef struct {
 	FOV* field_of_view;
 } Camera;
 
-Camera* load_camera(unsigned int window_width, unsigned int window_height);
+Camera* load_camera(Uint32 window_width, Uint32 window_height);
 void free_camera(Camera* camera);
-void move_camera_direction(float relative_x, float relative_y, Camera* camera, unsigned int window_width, unsigned int window_height);
+void move_camera_direction(float relative_x, float relative_y, Camera* camera, Uint32 window_width, Uint32 window_height);
 void move_camera_location(vec3 direction, Camera* camera);

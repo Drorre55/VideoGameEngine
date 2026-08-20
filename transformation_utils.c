@@ -24,7 +24,7 @@ void rotate_z_axis(vec3 vertex, float rotation_degree)
 	vertex[1] = vertex[0] * sin(rotation_degree) + vertex[1] * cos(rotation_degree);
 }
 
-float* lin_interp2d(float* source_vec, float* vector_x, float* vector_y, unsigned int num_objects)
+float* lin_interp2d(float* source_vec, float* vector_x, float* vector_y, Uint32 num_objects)
 {
 	float* distances = calloc(3, sizeof(float));
 	if (distances == NULL) {

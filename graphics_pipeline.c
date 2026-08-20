@@ -3,7 +3,7 @@
 
 
 void run_graphics_pipeline(Uint32* framebuffer, float* z_buffer, WorldObjects* world_objects, Camera* camera, 
-	unsigned int frame_width, unsigned int frame_height)
+	Uint32 frame_width, Uint32 frame_height)
 {
 	WorldObjects* camera_space_objects = transform_from_world_to_camera_space(world_objects, camera);
 	transform_scale_to_FOV(camera_space_objects, camera);

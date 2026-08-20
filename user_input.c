@@ -2,7 +2,7 @@
 #include "graphics_pipeline.h"
 
 
-SDL_AppResult user_events(Camera* camera, bool* show_fps, unsigned int window_width, unsigned int window_height)
+SDL_AppResult user_events(Camera* camera, bool* show_fps, Uint32 window_width, Uint32 window_height)
 {
 	SDL_Event event;
 

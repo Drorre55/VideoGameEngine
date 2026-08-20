@@ -30,7 +30,7 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 		return;
 	}
 	
-	unsigned int num_triangles_in_FOV = 0;
+	Uint32 num_triangles_in_FOV = 0;
 	for (int i = 0; i < FOV_space_objects->num_triangles; i++) {
 		Triangle* current_triangle = FOV_space_objects->triangles[i];
 		if (_count_points_inside_FOV(current_triangle, is_vertex_in_FOV) > 0) {
@@ -43,8 +43,8 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 	FOV_space_objects->num_triangles = num_triangles_in_FOV;
 }
 
-unsigned int _count_points_inside_FOV(Triangle* triangle, bool* is_vertex_in_FOV) {
-	unsigned int num_points_on_screen = 
+Uint32 _count_points_inside_FOV(Triangle* triangle, bool* is_vertex_in_FOV) {
+	Uint32 num_points_on_screen = 
 		is_vertex_in_FOV[triangle->corner1_idx] +
 		is_vertex_in_FOV[triangle->corner2_idx] +
 		is_vertex_in_FOV[triangle->corner3_idx];

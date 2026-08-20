@@ -7,17 +7,17 @@ typedef struct {
 } Color;
 
 typedef struct {
-	unsigned int corner1_idx;
-	unsigned int corner2_idx;
-	unsigned int corner3_idx;
+	Uint32 corner1_idx;
+	Uint32 corner2_idx;
+	Uint32 corner3_idx;
 } Triangle;
 
 typedef struct {
 	vec3** vertices;
 	Triangle** triangles;
 	Color** colors;
-	unsigned int num_vertices;
-	unsigned int num_triangles;
+	Uint32 num_vertices;
+	Uint32 num_triangles;
 } WorldObjects;
 
 WorldObjects* load_world_objects();
