@@ -14,6 +14,7 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		free(camera);
 		return NULL;
 	}
+	(*cam_point)[1] = -2.0;
 	camera->global_coords = cam_point;
 
 	vec3* x_direction = (vec3*)calloc(1, sizeof(vec3));

@@ -13,9 +13,9 @@ typedef struct {
 } Triangle;
 
 typedef struct {
-	vec3** vertices;
-	Triangle** triangles;
-	Color** colors;
+	vec3* vertices;
+	Triangle* triangles;
+	Color* colors;
 	Uint32 num_vertices;
 	Uint32 num_triangles;
 } WorldObjects;

@@ -14,19 +14,20 @@ void transform_to_pixel_space(WorldObjects* on_screen_objects, Uint32 frame_widt
 }
 
 void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height, WorldObjects* on_screen_objects) {
-	memset(z_buffer, 0, frame_width * frame_height * sizeof(float));
+	for (Uint32 i = 0; i < (frame_width * frame_height); i++)
+		z_buffer[i] = FLT_MAX;
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-		Triangle* current_triangle = on_screen_objects->triangles[i];
+		Triangle current_triangle = on_screen_objects->triangles[i];
 		_draw_triangle(current_triangle, on_screen_objects->vertices, on_screen_objects->colors, frame, z_buffer, frame_width, frame_height);
 	}
 	free_world_objects(on_screen_objects);
 }
 
-void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
+void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
 	Triangle sorted_triangle;
-	_sort_points_by_x(triangle, &sorted_triangle, vertices);
+	_sort_points_by_x(&triangle, &sorted_triangle, vertices);
 	
 	vec3* A = vertices[sorted_triangle.corner1_idx];
 	vec3* B = vertices[sorted_triangle.corner2_idx];
@@ -38,9 +39,9 @@ void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32*
 	float Az = (*A)[2], Bz = (*B)[2], Cz = (*C)[2];
 	
 	Uint8 corners_color[3][4];
-	memcpy(corners_color[0], colors[sorted_triangle.corner1_idx], sizeof(Color));
-	memcpy(corners_color[1], colors[sorted_triangle.corner2_idx], sizeof(Color));
-	memcpy(corners_color[2], colors[sorted_triangle.corner3_idx], sizeof(Color));
+	memcpy(corners_color[0], &colors[sorted_triangle.corner1_idx], sizeof(Color));
+	memcpy(corners_color[1], &colors[sorted_triangle.corner2_idx], sizeof(Color));
+	memcpy(corners_color[2], &colors[sorted_triangle.corner3_idx], sizeof(Color));
 
 	// Precompute edges
 	float ABx = Bx - Ax, ABy = By - Ay;
@@ -120,12 +121,12 @@ void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32*
 
 		int pixel_idx = y_min * frame_width + current_x;
 		for (int current_y = y_min; current_y <= y_max; current_y++) {
-			if (pixel_distance > z_buffer[pixel_idx]) {
+			if (pixel_distance < z_buffer[pixel_idx]) {
 				z_buffer[pixel_idx] = pixel_distance;
 
-				Uint8 interpolated_color[4];
+				Uint32 interpolated_color[4];
 				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
-					interpolated_color[color_ingrediant_idx] = (Uint8)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
+					interpolated_color[color_ingrediant_idx] = (Uint32)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
 				}
 				// draw_pixel[pixel_idx] => rgba_to_uint32
 				frame[pixel_idx] = (interpolated_color[0] << 24) | (interpolated_color[1] << 16) | (interpolated_color[2] << 8) | interpolated_color[3];
@@ -144,7 +145,7 @@ void _draw_triangle(Triangle* triangle, vec3** vertices, Color** colors, Uint32*
 	}
 }
 
-void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3** vertices)
+void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
 {
 	vec3* vertex_a = vertices[triangle->corner1_idx];
 	vec3* vertex_b = vertices[triangle->corner2_idx];

@@ -8,7 +8,7 @@ WorldObjects* transform_from_world_to_camera_space(WorldObjects* world_objects, 
 	vec3* degrees_between_camera_and_axis = _get_degrees_between_camera_and_axis(camera);
 	
 	for (int i = 0; i < camera_space_objects->num_vertices; i++) {
-		_transform_vertex_to_camera_space(*(camera_space_objects->vertices[i]), camera, *degrees_between_camera_and_axis);
+		_transform_vertex_to_camera_space(camera_space_objects->vertices[i], camera, *degrees_between_camera_and_axis);
 	}
 	free(degrees_between_camera_and_axis);
 

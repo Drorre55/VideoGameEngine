@@ -20,11 +20,11 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 		return NULL;
 	}
 	for (int i = 0; i < FOV_space_objects->num_vertices; i++) {
-		is_vertex_in_FOV[i] = _is_inside_FOV(*(FOV_space_objects->vertices[i]), 1.2);
+		is_vertex_in_FOV[i] = _is_inside_FOV(FOV_space_objects->vertices[i], 1.2);
 	}
 
-	// We take the max traingles possible right now to avoid reallocation
-	Triangle** triangles_in_FOV = (Triangle**)malloc(FOV_space_objects->num_triangles * sizeof(Triangle*));
+	// We take the max triangles possible right now to avoid reallocation
+	Triangle* triangles_in_FOV = (Triangle*)malloc(FOV_space_objects->num_triangles * sizeof(Triangle));
 	if (triangles_in_FOV == NULL) {
 		SDL_LogError(1, "Problem with malloc. can't cut objects outside of screen");
 		return;
@@ -32,7 +32,7 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 	
 	Uint32 num_triangles_in_FOV = 0;
 	for (int i = 0; i < FOV_space_objects->num_triangles; i++) {
-		Triangle* current_triangle = FOV_space_objects->triangles[i];
+		Triangle current_triangle = FOV_space_objects->triangles[i];
 		if (_count_points_inside_FOV(current_triangle, is_vertex_in_FOV) > 0) {
 			triangles_in_FOV[num_triangles_in_FOV] = current_triangle;
 			num_triangles_in_FOV++;
@@ -43,11 +43,11 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 	FOV_space_objects->num_triangles = num_triangles_in_FOV;
 }
 
-Uint32 _count_points_inside_FOV(Triangle* triangle, bool* is_vertex_in_FOV) {
+Uint32 _count_points_inside_FOV(Triangle triangle, bool* is_vertex_in_FOV) {
 	Uint32 num_points_on_screen = 
-		is_vertex_in_FOV[triangle->corner1_idx] +
-		is_vertex_in_FOV[triangle->corner2_idx] +
-		is_vertex_in_FOV[triangle->corner3_idx];
+		is_vertex_in_FOV[triangle.corner1_idx] +
+		is_vertex_in_FOV[triangle.corner2_idx] +
+		is_vertex_in_FOV[triangle.corner3_idx];
 	return num_points_on_screen;
 }
 

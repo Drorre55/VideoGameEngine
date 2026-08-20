@@ -144,6 +144,7 @@
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="camera_space_transform.h" />
+    <ClInclude Include="fast_obj.h" />
     <ClInclude Include="user_input.h" />
     <ClInclude Include="world_objects.h" />
     <ClInclude Include="graphics_pipeline.h" />
