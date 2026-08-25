@@ -123,6 +123,7 @@ void free_world_objects(WorldObjects* world_objects)
     world_objects->num_triangles = 0;
 
     free(world_objects);
+    world_objects = NULL;
 }
 
 WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
@@ -163,12 +164,12 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
 
     // 5. Allocate and copy contiguous color array
     if (src->num_triangles > 0 && src->colors != NULL) {
-        copy->colors = malloc(sizeof(Color) * src->num_triangles);
+        copy->colors = malloc(sizeof(Color) * src->num_vertices);
         if (!copy->colors) {
             free_world_objects(copy);
             return NULL;
         }
-        memcpy(copy->colors, src->colors, sizeof(Color) * src->num_triangles);
+        memcpy(copy->colors, src->colors, sizeof(Color) * src->num_vertices);
     }
     return copy;
 }
