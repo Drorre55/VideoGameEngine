@@ -43,7 +43,7 @@ vec3* direction_user_should_move()
 	}
 
 	const bool* key_states = SDL_GetKeyboardState(NULL);
-	const float step_size = 0.1;
+	const float step_size = 1;
 
 	if (key_states[SDL_SCANCODE_W])
 		(*direction)[2] += step_size;
@@ -60,6 +60,5 @@ vec3* direction_user_should_move()
 	if (key_states[SDL_SCANCODE_LCTRL])
 		(*direction)[1] -= step_size;
 	
-	// TODO: add jump on y axis
 	return direction;
 }

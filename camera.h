@@ -26,4 +26,4 @@ typedef struct {
 Camera* load_camera(Uint32 window_width, Uint32 window_height);
 void free_camera(Camera* camera);
 void move_camera_direction(float relative_x, float relative_y, Camera* camera, Uint32 window_width, Uint32 window_height);
-void move_camera_location(vec3 direction, Camera* camera);
+void move_camera_location(vec3 movement_vec, Camera* camera);
