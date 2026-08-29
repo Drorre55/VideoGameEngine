@@ -48,6 +48,9 @@
     <ClCompile Include="camera.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="visibility_filters.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -76,6 +79,9 @@
     </ClInclude>
     <ClInclude Include="fast_obj.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="visibility_filters.h">
+      <Filter>Header Files\Render Pipeline</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

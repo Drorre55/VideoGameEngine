@@ -8,7 +8,8 @@
 
 #define _USE_MATH_DEFINES
 #define FOV_CHOSEN 90
-
+#define VIEW_FRUSTUM_MAX 1000.0f
+#define VIEW_FRUSTUM_MIN 0.1f
 
 typedef struct {
 	float x_degree_from_center;

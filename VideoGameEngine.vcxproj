@@ -139,6 +139,7 @@
     <ClCompile Include="scale_to_FOV_transform.c" />
     <ClCompile Include="transformation_utils.c" />
     <ClCompile Include="user_input.c" />
+    <ClCompile Include="visibility_filters.c" />
     <ClCompile Include="world_objects.c" />
   </ItemGroup>
   <ItemGroup>
@@ -146,6 +147,7 @@
     <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="fast_obj.h" />
     <ClInclude Include="user_input.h" />
+    <ClInclude Include="visibility_filters.h" />
     <ClInclude Include="world_objects.h" />
     <ClInclude Include="graphics_pipeline.h" />
     <ClInclude Include="rasterizer.h" />

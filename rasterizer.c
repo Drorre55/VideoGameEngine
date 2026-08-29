@@ -98,7 +98,7 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 	// precompute color channel deltas
 	float Acolor_minus_C[4], Bcolor_minus_C[4], Ccolor[4];
 	float dcolor_dy[4], dcolor_dx[4];
-	for (int color_channel = 0; color_channel < 4; color_channel++) {
+	for (Uint8 color_channel = 0; color_channel < 4; color_channel++) {
 		Acolor_minus_C[color_channel] = (float)corners_color[0][color_channel] - (float)corners_color[2][color_channel];
 		Bcolor_minus_C[color_channel] = (float)corners_color[1][color_channel] - (float)corners_color[2][color_channel];
 		Ccolor[color_channel] = (float)corners_color[2][color_channel];
