@@ -72,13 +72,13 @@ WorldObjects* load_world_objects() {
 
             vec3 p0, p1, p2;
             p0[0] = mesh->positions[src0 * 3 + 0];
-            p0[1] = -mesh->positions[src0 * 3 + 1];
+            p0[1] = mesh->positions[src0 * 3 + 1];
             p0[2] = mesh->positions[src0 * 3 + 2];
             p1[0] = mesh->positions[src1 * 3 + 0];
-            p1[1] = -mesh->positions[src1 * 3 + 1];
+            p1[1] = mesh->positions[src1 * 3 + 1];
             p1[2] = mesh->positions[src1 * 3 + 2];
             p2[0] = mesh->positions[src2 * 3 + 0];
-            p2[1] = -mesh->positions[src2 * 3 + 1];
+            p2[1] = mesh->positions[src2 * 3 + 1];
             p2[2] = mesh->positions[src2 * 3 + 2];
 
             // Write 3 fresh vertices for this triangle

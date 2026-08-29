@@ -6,24 +6,38 @@ Uint32 rgba_to_uint32(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
 	return ((Uint32)r << 24) | ((Uint32)g << 16) | ((Uint32)b << 8) | (Uint32)a;
 }
 
-void rotate_x_axis(vec3 vertex, float rotation_degree)
+void rotate_x_axis(vec3 vertex, float rotation_radians)
 {
-	vertex[1] = vertex[1] * cos(rotation_degree) - vertex[2] * sin(rotation_degree);
-	vertex[2] = vertex[1] * sin(rotation_degree) + vertex[2] * cos(rotation_degree);
+    float y = vertex[1];
+    float z = vertex[2];
+    float cosine = cosf(rotation_radians);
+    float sine = sinf(rotation_radians);
+
+    vertex[1] = y * cosine - z * sine;
+    vertex[2] = y * sine + z * cosine;
 }
 
-void rotate_y_axis(vec3 vertex, float rotation_degree)
+void rotate_y_axis(vec3 vertex, float rotation_radians)
 {
-	vertex[0] = vertex[0] * cos(rotation_degree) + vertex[2] * sin(rotation_degree);
-	vertex[2] = vertex[0] * -sin(rotation_degree) + vertex[2] * cos(rotation_degree);
+    float x = vertex[0];
+    float z = vertex[2];
+    float cosine = cosf(rotation_radians);
+    float sine = sinf(rotation_radians);
+
+    vertex[0] = x * cosine + z * sine;
+    vertex[2] = -x * sine + z * cosine;
 }
 
-void rotate_z_axis(vec3 vertex, float rotation_degree)
+void rotate_z_axis(vec3 vertex, float rotation_radians)
 {
-	vertex[0] = vertex[0] * cos(rotation_degree) - vertex[1] * sin(rotation_degree);
-	vertex[1] = vertex[0] * sin(rotation_degree) + vertex[1] * cos(rotation_degree);
-}
+    float x = vertex[0];
+    float y = vertex[1];
+    float cosine = cosf(rotation_radians);
+    float sine = sinf(rotation_radians);
 
+    vertex[0] = x * cosine - y * sine;
+    vertex[1] = x * sine + y * cosine;
+}
 float* lin_interp2d(float* source_vec, float* vector_x, float* vector_y, Uint32 num_objects)
 {
 	float* distances = calloc(3, sizeof(float));

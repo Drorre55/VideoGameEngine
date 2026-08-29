@@ -1,23 +1,27 @@
 #include "scale_to_FOV_transform.h"
 
-// convert coords from camera space to field of view space - x,y values scaled to [-1, 1], and z is the distance
+// convert coords from camera space to field of view space - x,y values scaled to [-1, 1], and z [0,1]
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
-	for (int i = 0; i < world_objects->num_vertices; i++) {
+	float horizontal_scale = tanf(camera->field_of_view->x_degree_from_center);
+	float vertical_scale = tanf(camera->field_of_view->y_degree_from_center);
+
+	for (Uint32 i = 0; i < world_objects->num_vertices; i++) {
 		vec3* vertex = world_objects->vertices[i];
 
-		float distance = sqrt(pow((*vertex)[0], 2) + pow((*vertex)[1], 2) + pow((*vertex)[2], 2));
+		float vertex_z = (*vertex)[2];
+		if (vertex_z < VIEW_FRUSTUM_MIN) continue;
 
-		(*vertex)[0] /= tan(camera->field_of_view->x_degree_from_center) * (*vertex)[2];
-		(*vertex)[1] /= tan(camera->field_of_view->y_degree_from_center) * (*vertex)[2];
-		(*vertex)[2] = (1.0f / distance - 1.0f / VIEW_FRUSTUM_MAX) / (1.0f - 1.0f / VIEW_FRUSTUM_MAX);
+		(*vertex)[0] /= horizontal_scale * vertex_z;
+		(*vertex)[1] /= vertical_scale * vertex_z;
+		(*vertex)[2] = (vertex_z - VIEW_FRUSTUM_MIN) / (VIEW_FRUSTUM_MAX - VIEW_FRUSTUM_MIN);
 	}
 }
 
-void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
+void filter_non_visible_triangles(WorldObjects* FOV_space_objects) {
 	bool* is_vertex_in_FOV = (bool*)malloc(FOV_space_objects->num_vertices * sizeof(bool));
 	if (is_vertex_in_FOV == NULL) {
 		SDL_LogError(1, "Problem with malloc. can't cut triangles outside of FOV");
-		return NULL;
+		return;
 	}
 	for (int i = 0; i < FOV_space_objects->num_vertices; i++) {
 		is_vertex_in_FOV[i] = _is_inside_FOV(FOV_space_objects->vertices[i], 1.2);
@@ -39,6 +43,7 @@ void cut_triangles_completely_outside_FOV(WorldObjects* FOV_space_objects) {
 		}
 	}
 	free(FOV_space_objects->triangles);
+	free(is_vertex_in_FOV);
 	FOV_space_objects->triangles = triangles_in_FOV;
 	FOV_space_objects->num_triangles = num_triangles_in_FOV;
 }

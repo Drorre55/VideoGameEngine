@@ -7,7 +7,7 @@ void run_graphics_pipeline(Uint32* framebuffer, float* z_buffer, WorldObjects* w
 {
 	WorldObjects* camera_space_objects = transform_from_world_to_camera_space(world_objects, camera);
 	transform_scale_to_FOV(camera_space_objects, camera);
-	cut_triangles_completely_outside_FOV(camera_space_objects);
+	filter_non_visible_triangles(camera_space_objects);
 	transform_xy_from_FOV_space_to_01_scale(camera_space_objects);
 	transform_to_pixel_space(camera_space_objects, frame_width, frame_height);
 	rasterize_objects_to_frame(framebuffer, z_buffer, frame_width, frame_height, camera_space_objects);

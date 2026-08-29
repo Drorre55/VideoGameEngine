@@ -14,7 +14,7 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		free(camera);
 		return NULL;
 	}
-	(*cam_point)[1] = -2.0;
+	(*cam_point)[1] = 2.0;
 	camera->global_coords = cam_point;
 
 	vec3* x_direction = (vec3*)calloc(1, sizeof(vec3));
@@ -25,7 +25,7 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		return NULL;
 	}
 	camera->x_direction_vector = x_direction;
-	(*camera->x_direction_vector)[0] = -1.0;
+	(*camera->x_direction_vector)[0] = 1.0;
 
 	vec3* y_direction = (vec3*)calloc(1, sizeof(vec3));
 	if (y_direction == NULL) {
@@ -56,8 +56,13 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		return NULL;
 	}
 	camera->field_of_view = field_of_view;
-	camera->field_of_view->x_degree_from_center = M_PI * (FOV_CHOSEN / 180.0) / 2.0;
-	camera->field_of_view->y_degree_from_center = M_PI * ((float)window_height / (float)window_width) * (FOV_CHOSEN / 180.0) / 2.0;
+	
+	float horizontal_half_fov = M_PI * (FOV_CHOSEN / 180.0f) / 2.0f;
+
+	camera->field_of_view->x_degree_from_center = horizontal_half_fov;
+	camera->field_of_view->y_degree_from_center = atanf(
+		tanf(horizontal_half_fov) * ((float)window_height / (float)window_width)
+	);
 	return camera;
 }
 
@@ -97,7 +102,7 @@ void move_camera_location(vec3 direction, Camera* camera)
 	glm_normalize(global_movement);
 
 	static float sensitivity = 0.1;
-	(*camera->global_coords)[0] += -global_movement[0] * sensitivity;
+	(*camera->global_coords)[0] += global_movement[0] * sensitivity;
 	(*camera->global_coords)[1] += -global_movement[1] * sensitivity;
 	(*camera->global_coords)[2] += global_movement[2] * sensitivity;
 

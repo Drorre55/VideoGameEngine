@@ -60,16 +60,28 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 	int half2_end_x = (int)ceilf(glm_clamp(Cx, 0.0, frame_width - 1.0f));
 	if (half1_start_x == half2_end_x) return;
 
-	// Precompute slopes for edge stepping (used to compute column y-range)
+	// Precompute slopes for edge stepping (used to compute column y-range) + Guard against near-vertical edges (ABx/CBx/ACx ~ 0)
 	float AB_slope = ABy / ABx;
 	float AC_slope = ACy / ACx;
 	float BC_slope = CBy / CBx;
 
-	// get the edges of the triangle in this column
-	float AB_function = Ay + AB_slope * (half1_start_x - Ax);
-	float AC_function = Ay + AC_slope * (half1_start_x - Ax);
-	float BC_function = By + BC_slope * (half1_end_x - Bx);
+	AB_slope = (fabsf(AB_slope) > fabsf(ABy)) ? ABy : AB_slope;
+	AC_slope = (fabsf(AC_slope) > fabsf(ACy)) ? ACy : AC_slope;
+	BC_slope = (fabsf(BC_slope) > fabsf(CBy)) ? CBy : BC_slope;
 
+	float ABy_min = fminf(Ay, By), ABy_max = fmaxf(Ay, By);
+	float BCy_min = fminf(By, Cy), BCy_max = fmaxf(By, Cy);
+	float ACy_min = fminf(Ay, Cy), ACy_max = fmaxf(Ay, Cy);
+
+	float AB_function = glm_clamp(Ay + AB_slope * (half1_start_x - Ax), ABy_min, ABy_max);
+	float AC_function = glm_clamp(Ay + AC_slope * (half1_start_x - Ax), ACy_min, ACy_max);
+	float BC_function = glm_clamp(By + BC_slope * (half1_end_x - Bx), BCy_min, BCy_max);
+
+	// get the edges of the triangle in this column
+	/*float AB_function = Ay + AB_slope * (half1_start_x - Ax);
+	float AC_function = Ay + AC_slope * (half1_start_x - Ax);
+	float BC_function = By + BC_slope * (half1_end_x - Bx);*/
+	
 	// derivatives of barycentric weights
 	float dA_dx = CBy * inverse_triangle_area; // dwA/dx
 	float dA_dy = -CBx * inverse_triangle_area; // dwA/dy
@@ -96,12 +108,14 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 
 	float slope2 = AB_slope;
 	float edge_function2 = AB_function;
+	float edge_min_y = ABy_min, edge_max_y = ABy_max;
 
 	// walk columns from A.x to B.x (left half), then switch to B.x -> C.x (right half), and per column calc the edges pixels, then color between them
 	for (int current_x = half1_start_x; current_x <= half2_end_x; current_x++) {
 		if (current_x == half1_end_x) {
 			slope2 = BC_slope;
 			edge_function2 = BC_function;
+			edge_min_y = BCy_min; edge_max_y = BCy_max;
 		}
 
 		int y_min = (int)floorf(glm_clamp(fminf(edge_function2, AC_function), 0.0, frame_height - 1.0f));
@@ -140,8 +154,11 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 			pixel_idx += frame_width;
 		}
 		// move x 1 unit right for edge functions
-		edge_function2 += slope2;
-		AC_function += AC_slope;
+		/*edge_function2 += slope2;
+		AC_function += AC_slope;*/
+
+		edge_function2 = glm_clamp(edge_function2 + slope2, edge_min_y, edge_max_y);
+		AC_function = glm_clamp(AC_function + AC_slope, ACy_min, ACy_max);
 	}
 }
 
