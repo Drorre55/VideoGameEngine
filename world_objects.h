@@ -21,5 +21,6 @@ typedef struct {
 } WorldObjects;
 
 WorldObjects* load_world_objects();
+static Color _face_color_from_normal(vec3 a, vec3 b, vec3 c);
 void free_world_objects(WorldObjects* world_objects);
 WorldObjects* world_objects_deep_copy(WorldObjects* world_objects);

@@ -5,33 +5,9 @@
 #include "fast_obj.h"
 
 
-static Color face_color_from_normal(vec3 a, vec3 b, vec3 c) {
-    vec3 e1 = { b[0] - a[0], b[1] - a[1], b[2] - a[2] };
-    vec3 e2 = { c[0] - a[0], c[1] - a[1], c[2] - a[2] };
-    vec3 n = {
-        e1[1] * e2[2] - e1[2] * e2[1],
-        e1[2] * e2[0] - e1[0] * e2[2],
-        e1[0] * e2[1] - e1[1] * e2[0]
-    };
-    float len = sqrtf(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-    if (len > 1e-6f) { n[0] /= len; n[1] /= len; n[2] /= len; }
-
-    float ax = fabsf(n[0]), ay = fabsf(n[1]), az = fabsf(n[2]);
-
-    if (ax >= ay && ax >= az) {
-        return n[0] > 0 ? (Color) { 255, 80, 80, 255 } : (Color) { 150, 0, 0, 255 };
-    }
-    else if (ay >= ax && ay >= az) {
-        return n[1] > 0 ? (Color) { 80, 255, 80, 255 } : (Color) { 0, 150, 0, 255 };
-    }
-    else {
-        return n[2] > 0 ? (Color) { 80, 80, 255, 255 } : (Color) { 0, 0, 150, 255 };
-    }
-}
-
 WorldObjects* load_world_objects() {
     const char* filepath = "./renderer_test_scene.obj";
-    SDL_LogError(1, "Loading objects");
+    SDL_Log("Loading objects");
     fastObjMesh* mesh = fast_obj_read(filepath);
     if (!mesh) {
         SDL_LogError(1, "Error: Failed to load OBJ file '%s'", filepath);
@@ -90,7 +66,8 @@ WorldObjects* load_world_objects() {
             memcpy(obj->vertices[i1], p1, sizeof(vec3));
             memcpy(obj->vertices[i2], p2, sizeof(vec3));
 
-            Color c = face_color_from_normal(p0, p1, p2);
+            // Temp until import actual colors or texture from file 
+            Color c = _face_color_from_normal(p0, p1, p2);
             obj->colors[i0] = c;
             obj->colors[i1] = c;
             obj->colors[i2] = c;
@@ -106,6 +83,27 @@ WorldObjects* load_world_objects() {
 
     fast_obj_destroy(mesh);
     return obj;
+}
+
+static Color _face_color_from_normal(vec3 a, vec3 b, vec3 c) {
+    vec3 e1, e2, n;
+    glm_vec3_sub(b, a, e1);
+    glm_vec3_sub(c, a, e2);
+    glm_vec3_cross(e1, e2, n);
+
+    vec3 abs_n;
+    glm_vec3_normalize(n);
+    glm_vec3_abs(n, abs_n);
+
+    if (abs_n[0] >= abs_n[1] && abs_n[0] >= abs_n[2]) {
+        return n[0] > 0 ? (Color) { 255, 80, 80, 255 } : (Color) { 150, 0, 0, 255 };
+    }
+    else if (abs_n[1] >= abs_n[0] && abs_n[1] >= abs_n[2]) {
+        return n[1] > 0 ? (Color) { 80, 255, 80, 255 } : (Color) { 0, 150, 0, 255 };
+    }
+    else {
+        return n[2] > 0 ? (Color) { 80, 80, 255, 255 } : (Color) { 0, 0, 150, 255 };
+    }
 }
 
 void free_world_objects(WorldObjects* world_objects)
