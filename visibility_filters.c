@@ -67,7 +67,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			
 			memcpy(polygon_a[i].vertex, camera_space_objects->vertices[source_index], sizeof(vec3));
 			polygon_a[i].color = camera_space_objects->colors[source_index];
-		}
+		}	
 
 		ClipVertex* input_polygon = polygon_a;
 		ClipVertex* output_polygon = polygon_b;
