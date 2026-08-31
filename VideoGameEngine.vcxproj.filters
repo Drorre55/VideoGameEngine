@@ -84,4 +84,9 @@
       <Filter>Header Files\Render Pipeline</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Object Include="Assets\renderer_test_scene.obj">
+      <Filter>Resource Files</Filter>
+    </Object>
+  </ItemGroup>
 </Project>

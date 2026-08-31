@@ -6,7 +6,7 @@
 
 
 WorldObjects* load_world_objects() {
-    const char* filepath = "./renderer_test_scene.obj";
+    const char* filepath = "./Assets/renderer_test_scene.obj";
     SDL_Log("Loading objects");
     fastObjMesh* mesh = fast_obj_read(filepath);
     if (!mesh) {
@@ -192,7 +192,7 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
         glm_vec3_add(bottom_left, up_steps_from_origin, current_bottom);
         glm_vec3_add(current_bottom, up_step, current_top);
 
-        for (Uint32 col = 0; col < num_vertices_in_row; col+=2) {
+        for (Uint32 col = 0; col < num_vertices_in_row - 1; col+=2) {
             glm_vec3_copy(current_bottom, obj->vertices[row * num_vertices_in_row + col]);
             glm_vec3_copy(current_top, obj->vertices[row * num_vertices_in_row + col + 1]);
 
@@ -204,7 +204,7 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
     }
     // Temp all ground green
     for (Uint32 i = 0; i < total_vertices; i++) {
-        obj->colors[i] = (Color){ 0, 0, 0, 255 };
+        obj->colors[i] = (Color){ 0, 150, 0, 255 };
     }
     for (Uint32 row = 0; row < grid_row_count; row++) {
         for (Uint32 col = 0; col < num_triangles_in_row; col++) {
