@@ -108,10 +108,6 @@ WorldObjects* load_world_objects() {
     free_world_objects(obj);
     free(floor_mesh);
 
-    for (int i = 0; i < world_objects->num_vertices; i++) {
-        glm_vec3_print(world_objects->vertices[i], stdout);
-    }
-
     return world_objects;
 }
 
@@ -178,34 +174,40 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
         free(obj);
         return NULL;
     }
-
-    vec3 bottom_left = { 
-        -(float)(radius), 
-        0.0f, 
-        -(float)(radius) 
-    };
+    // Set vertices position
+    vec3 bottom_left = { -(float)(radius), 0.0f, -(float)(radius) };
     vec3 up_step = { 0.0f, 0.0f, (float)triangle_edge_size };
     vec3 right_step = { (float)triangle_edge_size, 0.0f, 0.0f };
-    for (Uint32 row = 0; row < grid_row_count; row++) {
-        vec3 up_steps_from_origin, current_bottom, current_top;
+    srand(0);
+    vec3 up_steps_from_origin, current_bottom, current_top;
+    glm_vec3_copy(bottom_left, current_bottom);
+    glm_vec3_add(current_bottom, up_step, current_top);
+    for (Uint32 col = 0; col < num_vertices_in_row - 1; col += 2) {
+        glm_vec3_copy(current_bottom, obj->vertices[col]);
+        obj->vertices[col][1] = (float)(rand() % 40) / 10 - 2 + 1;
+        glm_vec3_copy(current_top, obj->vertices[col + 1]);
+        obj->vertices[col + 1][1] = (float)(rand() % 40) / 10 - 2 + 1;
+
+        glm_vec3_add(current_bottom, right_step, current_bottom);
+        glm_vec3_add(current_top, right_step, current_top);
+    }
+    for (Uint32 row = 1; row < grid_row_count; row++) {
         glm_vec3_scale(up_step, row, up_steps_from_origin);
         glm_vec3_add(bottom_left, up_steps_from_origin, current_bottom);
         glm_vec3_add(current_bottom, up_step, current_top);
 
         for (Uint32 col = 0; col < num_vertices_in_row - 1; col+=2) {
-            glm_vec3_copy(current_bottom, obj->vertices[row * num_vertices_in_row + col]);
+            glm_vec3_copy(
+                obj->vertices[(row - 1) * num_vertices_in_row + col + 1], 
+                obj->vertices[row * num_vertices_in_row + col]
+            );
             glm_vec3_copy(current_top, obj->vertices[row * num_vertices_in_row + col + 1]);
+            obj->vertices[row * num_vertices_in_row + col + 1][1] = (rand() % 40) / 10 - 2 + 1;
 
-            glm_vec3_add(current_bottom, right_step, current_bottom);
             glm_vec3_add(current_top, right_step, current_top);
         }
-        SDL_Log("finished row: %d. current_top: ", row);
-        glm_vec3_print(current_top, stdout);
     }
-    // Temp all ground green
-    for (Uint32 i = 0; i < total_vertices; i++) {
-        obj->colors[i] = (Color){ 0, 150, 0, 255 };
-    }
+    // Set triangles' vertices' indices
     for (Uint32 row = 0; row < grid_row_count; row++) {
         for (Uint32 col = 0; col < num_triangles_in_row; col++) {
             Uint32 triangle_idx = row * num_triangles_in_row + col;
@@ -214,7 +216,10 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
             obj->triangles[triangle_idx].corner3_idx = row * num_vertices_in_row + col + 2;
         }
     }
-
+    // Temporary set all ground green
+    for (Uint32 i = 0; i < total_vertices; i++) {
+        obj->colors[i] = (Color){ 0, 150, 0, 255 };
+    }
     return obj;
 }
 
