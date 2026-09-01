@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="asset_loader.c" />
     <ClCompile Include="camera.c" />
     <ClCompile Include="camera_space_transform.c" />
     <ClCompile Include="graphics_pipeline.c" />
@@ -143,6 +144,7 @@
     <ClCompile Include="world_objects.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="asset_loader.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="fast_obj.h" />
@@ -166,6 +168,20 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </Object>
+    <Object Include="Assets\tree\tree 1.obj">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\tree\oak-a.fbx" />
+    <None Include="Assets\tree\oak-a.mb" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\tree\render maya software.jpg" />
+    <Image Include="Assets\tree\render mental ray.jpg" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,6 +1,7 @@
 #pragma once
-#include "camera.h"
+#pragma once
 
+#include "camera.h"
 
 typedef struct {
 	Uint8 r, g, b, a;
@@ -21,8 +22,8 @@ typedef struct {
 } WorldObjects;
 
 WorldObjects* load_world_objects();
-static Color _face_color_from_normal(vec3 a, vec3 b, vec3 c);
+void scale_world_objects(WorldObjects* world_objects, float scale);
 WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_size);
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects);
 void free_world_objects(WorldObjects* world_objects);
-WorldObjects* world_objects_deep_copy(WorldObjects* world_objects);
+WorldObjects* world_objects_deep_copy(const WorldObjects* world_objects);

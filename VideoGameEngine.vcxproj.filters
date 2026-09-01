@@ -19,6 +19,12 @@
     <Filter Include="Header Files\Render Pipeline">
       <UniqueIdentifier>{af2fe350-8d3c-4a9f-83e6-7dcbed38fefd}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Asset Loader">
+      <UniqueIdentifier>{c55421fc-27fd-4c7e-8f6e-49a528dfef66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\tree">
+      <UniqueIdentifier>{4ec1aa07-7e23-4936-9f05-d8032e264fa0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -51,6 +57,9 @@
     <ClCompile Include="visibility_filters.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="asset_loader.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -77,16 +86,38 @@
     <ClInclude Include="camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fast_obj.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="visibility_filters.h">
       <Filter>Header Files\Render Pipeline</Filter>
+    </ClInclude>
+    <ClInclude Include="fast_obj.h">
+      <Filter>Header Files\Asset Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="asset_loader.h">
+      <Filter>Header Files\Asset Loader</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Object Include="Assets\renderer_test_scene.obj">
       <Filter>Resource Files</Filter>
     </Object>
+    <Object Include="Assets\tree\tree 1.obj">
+      <Filter>Resource Files\tree</Filter>
+    </Object>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\tree\oak-a.fbx">
+      <Filter>Resource Files\tree</Filter>
+    </None>
+    <None Include="Assets\tree\oak-a.mb">
+      <Filter>Resource Files\tree</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Assets\tree\render maya software.jpg">
+      <Filter>Resource Files\tree</Filter>
+    </Image>
+    <Image Include="Assets\tree\render mental ray.jpg">
+      <Filter>Resource Files\tree</Filter>
+    </Image>
   </ItemGroup>
 </Project>
