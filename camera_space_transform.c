@@ -2,13 +2,10 @@
 #include "transformation_utils.h"
 
 
-WorldObjects* transform_from_world_to_camera_space(WorldObjects* world_objects, Camera* camera) {
-	WorldObjects* camera_space_objects = world_objects_deep_copy(world_objects);
-	
-	for (Uint32 i = 0; i < camera_space_objects->num_vertices; i++) {
-		_transform_vertex_to_camera_space(camera_space_objects->vertices[i], camera);
+void transform_from_world_to_camera_space(WorldObjects* world_objects, Camera* camera) {
+	for (Uint32 i = 0; i < world_objects->num_vertices; i++) {
+		_transform_vertex_to_camera_space(world_objects->vertices[i], camera);
 	}
-	return camera_space_objects;
 }
 
 void _transform_vertex_to_camera_space(vec3 world_vertex, Camera* camera)

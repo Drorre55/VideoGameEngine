@@ -38,22 +38,12 @@ void rotate_z_axis(vec3 vertex, float rotation_radians)
     vertex[0] = x * cosine - y * sine;
     vertex[1] = x * sine + y * cosine;
 }
-float* lin_interp2d(float* source_vec, float* vector_x, float* vector_y, Uint32 num_objects)
-{
-	float* distances = calloc(3, sizeof(float));
-	if (distances == NULL) {
-		SDL_LogError(1, "Problem with calloc. can't perform lin_interp2d");
-		return NULL;
-	}
-	for (int i = 0; i < 3; i++) {
-		float x_diff = source_vec[0] - vector_x[i];
-		float y_diff = source_vec[1] - vector_y[i];
-		distances[i] = x_diff * x_diff + y_diff * y_diff;
-	}
-	// normalize by the sum of distances
-	float sum_distances = distances[0] + distances[1] + distances[2];
-	glm_vec3_divs(distances, sum_distances, distances);
 
-	return distances;
+vec3* calc_normal(vec3 a, vec3 b, vec3 c, vec3 dest) {
+    vec3 e1, e2;
+    glm_vec3_sub(b, a, e1);
+    glm_vec3_sub(c, a, e2);
+    glm_vec3_cross(e1, e2, dest);
+    glm_vec3_normalize(dest);
+    return dest;
 }
-

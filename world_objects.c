@@ -7,7 +7,7 @@
 WorldObjects* load_world_objects() {
     WorldObjects* test_scene = load_obj_file("./Assets/renderer_test_scene.obj");
     WorldObjects* tree = load_obj_file("./Assets/tree/tree 1.obj");
-    scale_world_objects(tree, 0.5);
+    _scale_world_objects(tree, 0.5);
 
     WorldObjects* floor_mesh = _generate_ground_mesh(50, 5);
     WorldObjects* all_world_objects[3] = { floor_mesh, test_scene, tree };
@@ -20,10 +20,15 @@ WorldObjects* load_world_objects() {
     return world_objects;
 }
 
-void scale_world_objects(WorldObjects* world_objects, float scale) {
+static void _scale_world_objects(WorldObjects* world_objects, float scale) {
     for (Uint32 i = 0; i < world_objects->num_vertices; i++) {
         glm_vec3_scale(world_objects->vertices[i], scale, world_objects->vertices[i]);
     }
+}
+
+void _generate_normals(WorldObjects* world_objects)
+{
+
 }
 
 WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
@@ -102,10 +107,24 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
         }
     }
     // Set triangles' vertices' indices
+    vec3 normal;
     for (Uint32 row = 0; row < grid_row_count; row++) {
-        for (Uint32 col = 0; col < num_triangles_in_row; col++) {
+        for (Uint32 col = 0; col < num_triangles_in_row; col+=2) {
             Uint32 triangle_idx = row * num_triangles_in_row + col;
-            obj->triangles[triangle_idx].corner1_idx = row * num_vertices_in_row + col + 0;
+            obj->triangles[triangle_idx].corner1_idx = row * num_vertices_in_row + col + 1;
+            obj->triangles[triangle_idx].corner2_idx = row * num_vertices_in_row + col;
+            obj->triangles[triangle_idx].corner3_idx = row * num_vertices_in_row + col + 2;
+                
+            calc_normal(
+                obj->vertices[obj->triangles[triangle_idx].corner1_idx],
+                obj->vertices[obj->triangles[triangle_idx].corner2_idx],
+                obj->vertices[obj->triangles[triangle_idx].corner3_idx],
+                normal);
+            glm_vec3_print(normal, stdout);
+        }
+        for (Uint32 col = 1; col < num_triangles_in_row + 1; col+=2) {
+            Uint32 triangle_idx = row * num_triangles_in_row + col;
+            obj->triangles[triangle_idx].corner1_idx = row * num_vertices_in_row + col;
             obj->triangles[triangle_idx].corner2_idx = row * num_vertices_in_row + col + 1;
             obj->triangles[triangle_idx].corner3_idx = row * num_vertices_in_row + col + 2;
         }

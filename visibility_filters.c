@@ -1,6 +1,30 @@
 #include "visibility_filters.h"
 
 
+void visibility_culling(WorldObjects* world_objects, Camera* camera) {
+	backface_culling(world_objects, camera);
+}
+
+void backface_culling(WorldObjects* world_objects, Camera* camera)
+{
+	for (Uint32 i = 0; i < world_objects->num_triangles; i++) {
+		Triangle triangle = world_objects->triangles[i];
+		vec3* vertex1 = world_objects->vertices[world_objects->triangles[i].corner1_idx];
+		vec3* vertex2 = world_objects->vertices[world_objects->triangles[i].corner2_idx];
+		vec3* vertex3 = world_objects->vertices[world_objects->triangles[i].corner3_idx];
+
+		vec3 normal, vertex_to_camera;
+		calc_normal(vertex1, vertex2, vertex3, normal);
+		glm_vec3_sub(vertex1, camera->global_coords, vertex_to_camera);
+
+		if (glm_vec3_dot(vertex_to_camera, normal) < 0) {
+			world_objects->triangles[i] = world_objects->triangles[
+				world_objects->num_triangles - 1];
+			world_objects->num_triangles--;
+		}
+	}
+}
+
 void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camera)
 {
 	if (camera_space_objects == NULL || camera == NULL || camera_space_objects->num_triangles == 0)

@@ -104,22 +104,17 @@ WorldObjects* load_obj_file(const char* filepath)
 }
 
 static Color _face_color_from_normal(vec3 a, vec3 b, vec3 c) {
-    vec3 e1, e2, n;
-    glm_vec3_sub(b, a, e1);
-    glm_vec3_sub(c, a, e2);
-    glm_vec3_cross(e1, e2, n);
+    vec3 normal, abs_normal;
+    calc_normal(a, b, c, normal);
+    glm_vec3_abs(normal, abs_normal);
 
-    vec3 abs_n;
-    glm_vec3_normalize(n);
-    glm_vec3_abs(n, abs_n);
-
-    if (abs_n[0] >= abs_n[1] && abs_n[0] >= abs_n[2]) {
-        return n[0] > 0 ? (Color) { 255, 80, 80, 255 } : (Color) { 150, 0, 0, 255 };
+    if (abs_normal[0] >= abs_normal[1] && abs_normal[0] >= abs_normal[2]) {
+        return normal[0] > 0 ? (Color) { 255, 80, 80, 255 } : (Color) { 150, 0, 0, 255 };
     }
-    else if (abs_n[1] >= abs_n[0] && abs_n[1] >= abs_n[2]) {
-        return n[1] > 0 ? (Color) { 80, 255, 80, 255 } : (Color) { 0, 150, 0, 255 };
+    else if (abs_normal[1] >= abs_normal[0] && abs_normal[1] >= abs_normal[2]) {
+        return normal[1] > 0 ? (Color) { 80, 255, 80, 255 } : (Color) { 0, 150, 0, 255 };
     }
     else {
-        return n[2] > 0 ? (Color) { 80, 80, 255, 255 } : (Color) { 0, 0, 150, 255 };
+        return normal[2] > 0 ? (Color) { 80, 80, 255, 255 } : (Color) { 0, 0, 150, 255 };
     }
 }

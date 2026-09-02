@@ -25,6 +25,9 @@
     <Filter Include="Resource Files\tree">
       <UniqueIdentifier>{4ec1aa07-7e23-4936-9f05-d8032e264fa0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\tree\textures">
+      <UniqueIdentifier>{e1aa2254-e96c-47c2-a123-aa194dd2de9d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -54,11 +57,11 @@
     <ClCompile Include="camera.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="visibility_filters.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="asset_loader.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="visibility_filters.c">
+      <Filter>Source Files\Render Pipeline</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -113,11 +116,29 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Assets\tree\render maya software.jpg">
+    <Image Include="Assets\tree\textures\sol-herbe.jpg">
       <Filter>Resource Files\tree</Filter>
     </Image>
+    <Image Include="Assets\tree\textures\blue sky.png">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\textures\feuilles 1 D.tga">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\textures\feuilles 2 D.tga">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\render maya software.jpg">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
     <Image Include="Assets\tree\render mental ray.jpg">
-      <Filter>Resource Files\tree</Filter>
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\textures\tronc 1 D.tga">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\textures\tronc 2 D.tga">
+      <Filter>Resource Files\tree\textures</Filter>
     </Image>
   </ItemGroup>
 </Project>
