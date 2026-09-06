@@ -1,0 +1,146 @@
+# Renderer validation scene (Triangulated)
+# Coordinate convention:
+#   +X = right
+#   +Y = up
+#   +Z = forward / camera-facing
+#
+# Objects:
+#   Floor       - large tiled-style plane made from 4 quads
+#   Cube_Close  - close cube, tests depth and perspective
+#   Cube_Far    - distant cube, tests perspective
+#   Pyramid     - asymmetric pyramid, tests transforms/culling
+#   RGB_Triangle- single triangle for barycentric color interpolation
+#
+# The scene intentionally uses no textures or materials.
+# Vertex colors can be assigned by object/face in your engine.
+
+o Floor
+v -10 0 0
+v -5 0 0
+v 0 0 0
+v 5 0 0
+v 10 0 0
+v -10 0 5
+v -5 0 5
+v 0 0 5
+v 5 0 5
+v 10 0 5
+v -10 0 10
+v -5 0 10
+v 0 0 10
+v 5 0 10
+v 10 0 10
+v -10 0 15
+v -5 0 15
+v 0 0 15
+v 5 0 15
+v 10 0 15
+v -10 0 20
+v -5 0 20
+v 0 0 20
+v 5 0 20
+v 10 0 20
+
+# 4x4 floor tiles (Triangulated)
+#f 1 2 7
+#f 1 7 6
+#f 2 3 8
+#f 2 8 7
+#f 3 4 9
+#f 3 9 8
+#f 4 5 10
+#f 4 10 9
+#f 6 7 12
+#f 6 12 11
+#f 7 8 13
+#f 7 13 12
+#f 8 9 14
+#f 8 14 13
+#f 9 10 15
+#f 9 15 14
+#f 11 12 17
+#f 11 17 16
+#f 12 13 18
+#f 12 18 17
+#f 13 14 19
+#f 13 19 18
+#f 14 15 20
+#f 14 20 19
+#f 16 17 22
+#f 16 22 21
+#f 17 18 23
+#f 17 23 22
+#f 18 19 24
+#f 18 24 23
+#f 19 20 25
+#f 19 25 24
+
+o Cube_Close
+v -3 0 5
+v -1 0 5
+v -1 2 5
+v -3 2 5
+v -3 0 7
+v -1 0 7
+v -1 2 7
+v -3 2 7
+
+# Triangulated faces
+f 26 27 28
+f 26 28 29
+f 30 33 32
+f 30 32 31
+f 26 30 31
+f 26 31 27
+f 27 31 32
+f 27 32 28
+f 28 32 33
+f 28 33 29
+f 29 33 30
+f 29 30 26
+
+o Cube_Far
+v 2 0 14
+v 4 0 14
+v 4 2 14
+v 2 2 14
+v 2 0 16
+v 4 0 16
+v 4 2 16
+v 2 2 16
+
+# Triangulated faces
+f 34 35 36
+f 34 36 37
+f 38 41 40
+f 38 40 39
+f 34 38 39
+f 34 39 35
+f 35 39 40
+f 35 40 36
+f 36 40 41
+f 36 41 37
+f 37 41 38
+f 37 38 34
+
+o Pyramid
+v -1 0 9
+v 1 0 9
+v 1 0 11
+v -1 0 11
+v 0 2.5 10
+
+# Base triangulated, remaining faces were already triangles
+f 42 44 43
+f 42 45 44
+f 42 43 46
+f 43 44 46
+f 44 45 46
+f 45 42 46
+
+o RGB_Triangle
+v -4 0.05 10
+v -2 0.05 10
+v -3 2.05 10
+# Already a triangle
+f 47 48 49
