@@ -140,6 +140,7 @@
     <ClCompile Include="camera_space_transform.c" />
     <ClCompile Include="graphics_pipeline.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="perlin_noise.c" />
     <ClCompile Include="rasterizer.c" />
     <ClCompile Include="scale_to_FOV_transform.c" />
     <ClCompile Include="transformation_utils.c" />
@@ -152,6 +153,7 @@
     <ClInclude Include="camera.h" />
     <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="fast_obj.h" />
+    <ClInclude Include="perlin_noise.h" />
     <ClInclude Include="user_input.h" />
     <ClInclude Include="visibility_filters.h" />
     <ClInclude Include="world_objects.h" />

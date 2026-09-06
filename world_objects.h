@@ -2,6 +2,7 @@
 #pragma once
 
 #include "camera.h"
+#include "perlin_noise.h"
 
 typedef struct {
 	Uint8 r, g, b, a;
@@ -23,7 +24,6 @@ typedef struct {
 
 WorldObjects* load_world_objects();
 static void _scale_world_objects(WorldObjects* world_objects, float scale);
-static void _generate_normals(WorldObjects* world_objects);
 WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_size);
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects);
 void free_world_objects(WorldObjects* world_objects);

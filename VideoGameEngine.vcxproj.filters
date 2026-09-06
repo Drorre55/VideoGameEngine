@@ -63,6 +63,9 @@
     <ClCompile Include="visibility_filters.c">
       <Filter>Source Files\Render Pipeline</Filter>
     </ClCompile>
+    <ClCompile Include="perlin_noise.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -97,6 +100,9 @@
     </ClInclude>
     <ClInclude Include="asset_loader.h">
       <Filter>Header Files\Asset Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="perlin_noise.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

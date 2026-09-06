@@ -6,15 +6,15 @@
 
 WorldObjects* load_world_objects() {
     WorldObjects* test_scene = load_obj_file("./Assets/renderer_test_scene.obj");
-    WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
-    _scale_world_objects(tree, 0.5);
+    //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
+    //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* floor_mesh = _generate_ground_mesh(50, 5);
-    WorldObjects* all_world_objects[3] = { floor_mesh, test_scene, tree };
+    WorldObjects* floor_mesh = _generate_ground_mesh(500, 4);
+    WorldObjects* all_world_objects[3] = { floor_mesh, test_scene }; //tree };
     
-    WorldObjects* world_objects = _concat_world_objects(all_world_objects, 3);
+    WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
     free_world_objects(test_scene);
-    free_world_objects(tree);
+    //free_world_objects(tree);
     free(floor_mesh);
 
     return world_objects;
@@ -24,11 +24,6 @@ static void _scale_world_objects(WorldObjects* world_objects, float scale) {
     for (Uint32 i = 0; i < world_objects->num_vertices; i++) {
         glm_vec3_scale(world_objects->vertices[i], scale, world_objects->vertices[i]);
     }
-}
-
-void _generate_normals(WorldObjects* world_objects)
-{
-
 }
 
 WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
@@ -73,19 +68,44 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
         free(obj);
         return NULL;
     }
+
+    vec2* gradients3 = perlin_gradients(3, 42);
+    vec2* gradients6 = perlin_gradients(6, 42);
+    vec2* gradients12 = perlin_gradients(12, 42);
+    vec2* gradients24 = perlin_gradients(24, 42);
+
+    // Preperation for normalization [0, 1]
+    vec2 normalize_numerator, normalize_denominator, normalized_point;
+    vec2 max_bounds = { (float)(radius), (float)(radius) };
+    glm_vec2_scale(max_bounds, 2.f, normalize_denominator);
+
     // Set vertices position
     vec3 bottom_left = { -(float)(radius), 0.0f, -(float)(radius) };
     vec3 up_step = { 0.0f, 0.0f, (float)triangle_edge_size };
     vec3 right_step = { (float)triangle_edge_size, 0.0f, 0.0f };
-    srand(0);
     vec3 up_steps_from_origin, current_bottom, current_top;
     glm_vec3_copy(bottom_left, current_bottom);
     glm_vec3_add(current_bottom, up_step, current_top);
     for (Uint32 col = 0; col < num_vertices_in_row - 1; col += 2) {
         glm_vec3_copy(current_bottom, obj->vertices[col]);
-        obj->vertices[col][1] = (float)(rand() % 40) / 10 - 2 + 1;
+        vec2 vertex2d = { (float)obj->vertices[col][0], (float)obj->vertices[col][2] };
+        glm_vec2_add(vertex2d, max_bounds, normalize_numerator);
+        glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
+        obj->vertices[col][1] = 100 * (
+            perlin_noise(normalized_point, 3, gradients3) 
+            + 0.5 * perlin_noise(normalized_point, 6, gradients6)
+            + 0.25 * perlin_noise(normalized_point, 12, gradients12)
+            + 0.125 * perlin_noise(normalized_point, 24, gradients24));
+        
         glm_vec3_copy(current_top, obj->vertices[col + 1]);
-        obj->vertices[col + 1][1] = (float)(rand() % 40) / 10 - 2 + 1;
+        vec2 vertex2d_next = { (float)obj->vertices[col + 1][0], (float)obj->vertices[col + 1][2] };
+        glm_vec2_add(vertex2d_next, max_bounds, normalize_numerator);
+        glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
+        obj->vertices[col + 1][1] = 100 * (
+            perlin_noise(normalized_point, 3, gradients3)
+            + 0.5 * perlin_noise(normalized_point, 6, gradients6)
+            + 0.25 * perlin_noise(normalized_point, 12, gradients12)
+            + 0.125 * perlin_noise(normalized_point, 24, gradients24));
 
         glm_vec3_add(current_bottom, right_step, current_bottom);
         glm_vec3_add(current_top, right_step, current_top);
@@ -101,7 +121,17 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
                 obj->vertices[row * num_vertices_in_row + col]
             );
             glm_vec3_copy(current_top, obj->vertices[row * num_vertices_in_row + col + 1]);
-            obj->vertices[row * num_vertices_in_row + col + 1][1] = (rand() % 40) / 10 - 2 + 1;
+            vec2 vertex2d = { 
+                (float)obj->vertices[row * num_vertices_in_row + col + 1][0],
+                (float)obj->vertices[row * num_vertices_in_row + col + 1][2]
+            };
+            glm_vec2_add(vertex2d, max_bounds, normalize_numerator);
+            glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
+            obj->vertices[row * num_vertices_in_row + col + 1][1] = 100 * (
+                perlin_noise(normalized_point, 3, gradients3)
+                + 0.5 * perlin_noise(normalized_point, 6, gradients6)
+                + 0.25 * perlin_noise(normalized_point, 12, gradients12)
+                + 0.125 * perlin_noise(normalized_point, 24, gradients24));
 
             glm_vec3_add(current_top, right_step, current_top);
         }
