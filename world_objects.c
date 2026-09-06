@@ -6,7 +6,7 @@
 
 WorldObjects* load_world_objects() {
     WorldObjects* test_scene = load_obj_file("./Assets/renderer_test_scene.obj");
-    WorldObjects* tree = load_obj_file("./Assets/tree/tree 1.obj");
+    WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     _scale_world_objects(tree, 0.5);
 
     WorldObjects* floor_mesh = _generate_ground_mesh(50, 5);
@@ -114,13 +114,6 @@ WorldObjects* _generate_ground_mesh(Uint32 radius, Uint32 triangle_edge_size)
             obj->triangles[triangle_idx].corner1_idx = row * num_vertices_in_row + col + 1;
             obj->triangles[triangle_idx].corner2_idx = row * num_vertices_in_row + col;
             obj->triangles[triangle_idx].corner3_idx = row * num_vertices_in_row + col + 2;
-                
-            calc_normal(
-                obj->vertices[obj->triangles[triangle_idx].corner1_idx],
-                obj->vertices[obj->triangles[triangle_idx].corner2_idx],
-                obj->vertices[obj->triangles[triangle_idx].corner3_idx],
-                normal);
-            glm_vec3_print(normal, stdout);
         }
         for (Uint32 col = 1; col < num_triangles_in_row + 1; col+=2) {
             Uint32 triangle_idx = row * num_triangles_in_row + col;
