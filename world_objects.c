@@ -6,15 +6,15 @@
 
 WorldObjects* load_world_objects() {
     WorldObjects* test_scene = load_obj_file("./Assets/renderer_test_scene.obj");
-    //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
-    //_scale_world_objects(tree, 0.5);
+    WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
+    _scale_world_objects(tree, 0.5);
 
     WorldObjects* floor_mesh = _generate_ground_mesh(500, 4);
-    WorldObjects* all_world_objects[3] = { floor_mesh, test_scene }; //tree };
+    WorldObjects* all_world_objects[3] = { floor_mesh, test_scene, tree };
     
-    WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
+    WorldObjects* world_objects = _concat_world_objects(all_world_objects, 3);
     free_world_objects(test_scene);
-    //free_world_objects(tree);
+    free_world_objects(tree);
     free(floor_mesh);
 
     return world_objects;

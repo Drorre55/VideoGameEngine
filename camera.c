@@ -88,23 +88,23 @@ void move_camera_direction(float relative_x, float relative_y, Camera* camera, U
 	SDL_Log("new camera z direction: (%f, %f, %f)", (*camera->z_direction_vector)[0], (*camera->z_direction_vector)[1], (*camera->z_direction_vector)[2]);
 }
 
-void move_camera_location(vec3 direction, Camera* camera)
+void move_camera_location(ivec3 direction, Camera* camera, float delta_time)
 {
 	if (!direction[0] && !direction[1] && !direction[2])
 		return;
 	vec3 x_movement, y_movement, z_movement, global_movement;
-	glm_vec3_scale(*camera->x_direction_vector, direction[0], x_movement);
-	glm_vec3_scale(*camera->y_direction_vector, direction[1], y_movement);
-	glm_vec3_scale(*camera->z_direction_vector, direction[2], z_movement);
+	glm_vec3_scale(*camera->x_direction_vector, (float)direction[0], x_movement);
+	glm_vec3_scale(*camera->y_direction_vector, (float)direction[1], y_movement);
+	glm_vec3_scale(*camera->z_direction_vector, (float)direction[2], z_movement);
 	global_movement[0] = x_movement[0] + y_movement[0] + z_movement[0];
 	global_movement[1] = x_movement[1] + y_movement[1] + z_movement[1];
 	global_movement[2] = x_movement[2] + y_movement[2] + z_movement[2];
 	glm_normalize(global_movement);
 
-	static float sensitivity = 0.1;
-	(*camera->global_coords)[0] += global_movement[0] * sensitivity;
-	(*camera->global_coords)[1] += -global_movement[1] * sensitivity;
-	(*camera->global_coords)[2] += global_movement[2] * sensitivity;
+	static float speed = 3.f;
+	(*camera->global_coords)[0] += global_movement[0] * speed * delta_time;
+	(*camera->global_coords)[1] += -global_movement[1] * speed * delta_time;
+	(*camera->global_coords)[2] += global_movement[2] * speed * delta_time;
 
 	SDL_Log("new camera location: (%f, %f, %f)", (*camera->global_coords)[0], (*camera->global_coords)[1], (*camera->global_coords)[2]);
 }

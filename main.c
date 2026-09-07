@@ -78,14 +78,14 @@ SDL_AppResult load_world() {
 	return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult handle_input() {
+SDL_AppResult handle_input(float delta_time) {
 	SDL_AppResult app_result;
 
 	app_result = user_events(camera, &show_fps, WINDOW_WIDTH, WINDOW_HEIGHT);
 	if (app_result != SDL_APP_CONTINUE)
 		return app_result;
 	
-	move_camera_location(*direction_user_should_move(), camera);
+	move_camera_location(*direction_user_should_move(), camera, delta_time);
 
 	return SDL_APP_CONTINUE;
 }
@@ -134,20 +134,24 @@ void main() {
 		engine_status = load_world();
 	SDL_Log("loaded world");
 
-	Uint64 last_time = SDL_GetTicks();
-	int frames = 0;
-	int fps = 0;
+	Uint64 last_time_fps, last_time_delta;
+	last_time_fps = last_time_delta = SDL_GetTicks();
+	int frames, fps;
+	frames = fps = 0;
+	float delta_time;
 	if (engine_status == SDL_APP_CONTINUE) {
 		while (1) {
 			Uint64 current_time = SDL_GetTicks();
 			frames++;
-			if (current_time > last_time + 1000) {
+			if (current_time > last_time_fps + 1000) {
 				fps = frames;
 				frames = 0;
-				last_time = current_time;
+				last_time_fps = current_time;
 			}
+			delta_time = (float)(current_time - last_time_delta) / 1000.0f;
+			last_time_delta = current_time;
 
-			engine_status = handle_input();
+			engine_status = handle_input(delta_time);
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
 
