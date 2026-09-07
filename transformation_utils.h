@@ -1,5 +1,7 @@
 #pragma once
-#include "world_objects.h"
+
+#include "SDL3/SDL.h"
+#include "cglm/cglm.h"
 
 Uint32 rgba_to_uint32(Uint8 r, Uint8 g, Uint8 b, Uint8 a);
 void rotate_x_axis(vec3 vertice, float rotation_degree);

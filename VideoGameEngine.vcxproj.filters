@@ -66,6 +66,9 @@
     <ClCompile Include="perlin_noise.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="texture.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="world_objects.h">
@@ -104,6 +107,12 @@
     <ClInclude Include="perlin_noise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Header Files\Asset Loader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Object Include="Assets\renderer_test_scene.obj">
@@ -122,9 +131,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Assets\tree\textures\sol-herbe.jpg">
-      <Filter>Resource Files\tree</Filter>
-    </Image>
     <Image Include="Assets\tree\textures\blue sky.png">
       <Filter>Resource Files\tree\textures</Filter>
     </Image>
@@ -134,16 +140,13 @@
     <Image Include="Assets\tree\textures\feuilles 2 D.tga">
       <Filter>Resource Files\tree\textures</Filter>
     </Image>
-    <Image Include="Assets\tree\render maya software.jpg">
-      <Filter>Resource Files\tree\textures</Filter>
-    </Image>
-    <Image Include="Assets\tree\render mental ray.jpg">
-      <Filter>Resource Files\tree\textures</Filter>
-    </Image>
     <Image Include="Assets\tree\textures\tronc 1 D.tga">
       <Filter>Resource Files\tree\textures</Filter>
     </Image>
     <Image Include="Assets\tree\textures\tronc 2 D.tga">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
+    <Image Include="Assets\tree\textures\sol-herbe.jpg">
       <Filter>Resource Files\tree\textures</Filter>
     </Image>
   </ItemGroup>

@@ -4,6 +4,7 @@
 typedef struct {
 	vec3 vertex;
 	Color color;
+	vec2 uv;
 } ClipVertex;
 
 typedef struct {

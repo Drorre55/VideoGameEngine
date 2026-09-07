@@ -143,6 +143,7 @@
     <ClCompile Include="perlin_noise.c" />
     <ClCompile Include="rasterizer.c" />
     <ClCompile Include="scale_to_FOV_transform.c" />
+    <ClCompile Include="texture.c" />
     <ClCompile Include="transformation_utils.c" />
     <ClCompile Include="user_input.c" />
     <ClCompile Include="visibility_filters.c" />
@@ -154,6 +155,8 @@
     <ClInclude Include="camera_space_transform.h" />
     <ClInclude Include="fast_obj.h" />
     <ClInclude Include="perlin_noise.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="texture.h" />
     <ClInclude Include="user_input.h" />
     <ClInclude Include="visibility_filters.h" />
     <ClInclude Include="world_objects.h" />
@@ -186,8 +189,6 @@
     <None Include="Assets\tree\oak-a.mb" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Assets\tree\render maya software.jpg" />
-    <Image Include="Assets\tree\render mental ray.jpg" />
     <Image Include="Assets\tree\textures\blue sky.png" />
     <Image Include="Assets\tree\textures\feuilles 1 D.tga" />
     <Image Include="Assets\tree\textures\feuilles 2 D.tga" />

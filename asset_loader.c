@@ -34,6 +34,7 @@ WorldObjects* load_obj_file(const char* filepath)
     if (!obj->vertices) {
         SDL_LogError(1, "Error: Failed to generate ground mesh");
         free(obj);
+        fast_obj_destroy(mesh);
         return NULL;
     }
     obj->colors = malloc(sizeof(Color) * obj->num_vertices);
@@ -41,15 +42,47 @@ WorldObjects* load_obj_file(const char* filepath)
         SDL_LogError(1, "Error: Failed to generate ground mesh");
         free(obj->vertices);
         free(obj);
+        fast_obj_destroy(mesh);
+        return NULL;
+    }
+    obj->uvs = malloc(sizeof(vec2) * obj->num_vertices);
+    if (!obj->uvs) {
+        SDL_LogError(1, "Error: Failed to allocate UVs for '%s'", filepath);
+        free(obj->colors);
+        free(obj->vertices);
+        free(obj);
+        fast_obj_destroy(mesh);
         return NULL;
     }
     obj->triangles = malloc(sizeof(Triangle) * obj->num_triangles);
     if (!obj->triangles) {
         SDL_LogError(1, "Error: Failed to generate ground mesh");
+        free(obj->uvs);
         free(obj->colors);
         free(obj->vertices);
         free(obj);
+        fast_obj_destroy(mesh);
         return NULL;
+    }
+    obj->triangle_texture_indices = malloc(sizeof(Uint32) * obj->num_triangles);
+    if (!obj->triangle_texture_indices) {
+        SDL_LogError(1, "Error: Failed to allocate triangle textures for '%s'", filepath);
+        free(obj->triangles);
+        free(obj->uvs);
+        free(obj->colors);
+        free(obj->vertices);
+        free(obj);
+        fast_obj_destroy(mesh);
+        return NULL;
+    }
+    obj->texture_bank = texture_bank_create(1);
+    
+    for (Uint32 i = 0; i < obj->num_vertices; i++) {
+        obj->uvs[i][0] = -1.f;
+        obj->uvs[i][1] = -1.f;
+    }
+    for (Uint32 i = 0; i < obj->num_triangles; i++) {
+        obj->triangle_texture_indices[i] = TEXTURE_NONE;
     }
 
     Uint32 index_cursor = 0;
@@ -64,6 +97,10 @@ WorldObjects* load_obj_file(const char* filepath)
             Uint32 src0 = mesh->indices[index_cursor].p;
             Uint32 src1 = mesh->indices[index_cursor + v].p;
             Uint32 src2 = mesh->indices[index_cursor + v + 1].p;
+
+            Uint32 tex0 = mesh->indices[index_cursor].t;
+            Uint32 tex1 = mesh->indices[index_cursor + v].t;
+            Uint32 tex2 = mesh->indices[index_cursor + v + 1].t;
 
             vec3 p0, p1, p2;
             p0[0] = mesh->positions[src0 * 3 + 0];
@@ -84,6 +121,15 @@ WorldObjects* load_obj_file(const char* filepath)
             glm_vec3_copy(p0, obj->vertices[i0]);
             glm_vec3_copy(p1, obj->vertices[i1]);
             glm_vec3_copy(p2, obj->vertices[i2]);
+
+            if (mesh->texcoords && tex0 != 0 && tex1 != 0 && tex2 != 0) {
+                obj->uvs[i0][0] = mesh->texcoords[(tex0 * 2) + 0];
+                obj->uvs[i0][1] = mesh->texcoords[(tex0 * 2) + 1];
+                obj->uvs[i1][0] = mesh->texcoords[(tex1 * 2) + 0];
+                obj->uvs[i1][1] = mesh->texcoords[(tex1 * 2) + 1];
+                obj->uvs[i2][0] = mesh->texcoords[(tex2 * 2) + 0];
+                obj->uvs[i2][1] = mesh->texcoords[(tex2 * 2) + 1];
+            }
 
             // Temp until import actual colors or texture from file 
             Color c = _face_color_from_normal(p0, p1, p2);

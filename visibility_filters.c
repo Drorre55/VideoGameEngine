@@ -59,12 +59,14 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 
 	vec3* clipped_vertices = malloc(sizeof(vec3) * maximum_vertices);
 	Color* clipped_colors = malloc(sizeof(Color) * maximum_vertices);
+	vec2* clipped_uvs = malloc(sizeof(vec2) * maximum_vertices);
 	Triangle* clipped_triangles = malloc(sizeof(Triangle) * maximum_triangles);
 
-	if (clipped_vertices == NULL || clipped_colors == NULL || clipped_triangles == NULL) {
+	if (clipped_vertices == NULL || clipped_colors == NULL || clipped_uvs == NULL || clipped_triangles == NULL) {
 		SDL_LogError(1, "Could not allocate memory for frustum clipping");
 		free(clipped_vertices);
 		free(clipped_colors);
+		free(clipped_uvs);
 		free(clipped_triangles);
 		return;
 	}
@@ -89,8 +91,9 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		for (Uint32 i = 0; i < 3; i++) {
 			Uint32 source_index = source_indices[i];
 			
-			memcpy(polygon_a[i].vertex, camera_space_objects->vertices[source_index], sizeof(vec3));
+			glm_vec3_copy(camera_space_objects->vertices[source_index], polygon_a[i].vertex);
 			polygon_a[i].color = camera_space_objects->colors[source_index];
+			glm_vec2_copy(camera_space_objects->uvs[source_index], polygon_a[i].uv);
 		}	
 
 		ClipVertex* input_polygon = polygon_a;
@@ -116,6 +119,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 				SDL_LogError(1, "Frustum clipping output exceeded allocated capacity");
 				free(clipped_vertices);
 				free(clipped_colors);
+				free(clipped_uvs);
 				free(clipped_triangles);
 				return;
 			}
@@ -136,6 +140,10 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			clipped_colors[second_index] = second->color;
 			clipped_colors[third_index] = third->color;
 
+			glm_vec2_copy(first->uv, clipped_uvs[first_index]);
+			glm_vec2_copy(second->uv, clipped_uvs[second_index]);
+			glm_vec2_copy(third->uv, clipped_uvs[third_index]);
+
 			clipped_triangles[triangle_count].corner1_idx = first_index;
 			clipped_triangles[triangle_count].corner2_idx = second_index;
 			clipped_triangles[triangle_count].corner3_idx = third_index;
@@ -146,10 +154,12 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 
 	free(camera_space_objects->vertices);
 	free(camera_space_objects->colors);
+	free(camera_space_objects->uvs);
 	free(camera_space_objects->triangles);
 
 	camera_space_objects->vertices = clipped_vertices;
 	camera_space_objects->colors = clipped_colors;
+	camera_space_objects->uvs = clipped_uvs;
 	camera_space_objects->triangles = clipped_triangles;
 	camera_space_objects->num_vertices = vertex_count;
 	camera_space_objects->num_triangles = triangle_count;
@@ -213,6 +223,9 @@ static ClipVertex _interpolate_clip_vertex(const ClipVertex* first, const ClipVe
 	result.color.g = (Uint8)(first->color.g + (second->color.g - first->color.g) * interpolation);
 	result.color.b = (Uint8)(first->color.b + (second->color.b - first->color.b) * interpolation);
 	result.color.a = (Uint8)(first->color.a + (second->color.a - first->color.a) * interpolation);
+
+	result.uv[0] = first->uv[0] + (second->uv[0] - first->uv[0]) * interpolation;
+	result.uv[1] = first->uv[1] + (second->uv[1] - first->uv[1]) * interpolation;
 
 	return result;
 }

@@ -18,15 +18,18 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_wid
 		z_buffer[i] = FLT_MAX;
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-		Triangle current_triangle = on_screen_objects->triangles[i];
-		_draw_triangle(current_triangle, on_screen_objects->vertices, on_screen_objects->colors, frame, z_buffer, frame_width, frame_height);
+		_draw_triangle(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
 	}
 	free_world_objects(on_screen_objects);
 }
 
-void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
+static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
+	vec3* vertices = world_objects->vertices;
+	Color* colors = world_objects->colors;
+	vec2* uvs = world_objects->uvs;
 	Triangle sorted_triangle;
+	Triangle triangle = world_objects->triangles[triangle_index];
 	_sort_points_by_x(&triangle, &sorted_triangle, vertices);
 	
 	vec3* A = vertices[sorted_triangle.corner1_idx];
@@ -42,6 +45,11 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 	memcpy(corners_color[0], &colors[sorted_triangle.corner1_idx], sizeof(Color));
 	memcpy(corners_color[1], &colors[sorted_triangle.corner2_idx], sizeof(Color));
 	memcpy(corners_color[2], &colors[sorted_triangle.corner3_idx], sizeof(Color));
+
+	vec2 corners_uv[3];
+	glm_vec2_copy(uvs[sorted_triangle.corner1_idx], corners_uv[0]);
+	glm_vec2_copy(uvs[sorted_triangle.corner2_idx], corners_uv[1]); 
+	glm_vec2_copy(uvs[sorted_triangle.corner3_idx], corners_uv[2]); 
 
 	// Precompute edges
 	float ABx = Bx - Ax, ABy = By - Ay;
@@ -77,11 +85,6 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 	float AC_function = glm_clamp(Ay + AC_slope * (half1_start_x - Ax), ACy_min, ACy_max);
 	float BC_function = glm_clamp(By + BC_slope * (half1_end_x - Bx), BCy_min, BCy_max);
 
-	// get the edges of the triangle in this column
-	/*float AB_function = Ay + AB_slope * (half1_start_x - Ax);
-	float AC_function = Ay + AC_slope * (half1_start_x - Ax);
-	float BC_function = By + BC_slope * (half1_end_x - Bx);*/
-	
 	// derivatives of barycentric weights
 	float dA_dx = CBy * inverse_triangle_area; // dwA/dx
 	float dA_dy = -CBx * inverse_triangle_area; // dwA/dy
@@ -106,16 +109,36 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 		dcolor_dx[color_channel] = Acolor_minus_C[color_channel] * dA_dx + Bcolor_minus_C[color_channel] * dB_dx;
 	}
 
+	// precompute uv deltas
+	float Auv_minus_C[2], Buv_minus_C[2], Cuv[2];
+	float duv_dy[2], duv_dx[2];
+	for (Uint8 uv = 0; uv < 2; uv++) {
+		Auv_minus_C[uv] = corners_uv[0][uv] - corners_uv[2][uv];
+		Buv_minus_C[uv] = corners_uv[1][uv] - corners_uv[2][uv];
+		Cuv[uv] = corners_uv[2][uv];
+		duv_dy[uv] = Auv_minus_C[uv] * dA_dy + Buv_minus_C[uv] * dB_dy;
+		duv_dx[uv] = Auv_minus_C[uv] * dA_dx + Buv_minus_C[uv] * dB_dx;
+	}
+
 	float slope2 = AB_slope;
 	float edge_function2 = AB_function;
 	float edge_min_y = ABy_min, edge_max_y = ABy_max;
+
+	const int has_texture = world_objects->triangle_texture_indices
+		&& triangle_index < world_objects->num_triangles
+		&& world_objects->triangle_texture_indices[triangle_index] != TEXTURE_NONE
+		&& world_objects->triangle_texture_indices[triangle_index] < world_objects->texture_bank.count;
+	
+	Uint32 texture_index = has_texture ? world_objects->triangle_texture_indices[triangle_index] : TEXTURE_NONE;
+	Texture2D* texture = has_texture ? &world_objects->texture_bank.textures[texture_index] : NULL;
 
 	// walk columns from A.x to B.x (left half), then switch to B.x -> C.x (right half), and per column calc the edges pixels, then color between them
 	for (int current_x = half1_start_x; current_x <= half2_end_x; current_x++) {
 		if (current_x == half1_end_x) {
 			slope2 = BC_slope;
 			edge_function2 = BC_function;
-			edge_min_y = BCy_min; edge_max_y = BCy_max;
+			edge_min_y = BCy_min;
+			edge_max_y = BCy_max;
 		}
 
 		int y_min = (int)floorf(glm_clamp(fminf(edge_function2, AC_function), 0.0, frame_height - 1.0f));
@@ -124,7 +147,6 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 		// calc weights using the Barycentric method once per column for the starting row
 		float A_weight = (current_x - Cx) * dA_dx + (y_min - Cy) * dA_dy;
 		float B_weight = (current_x - Ax) * dB_dx + (y_min - Ay) * dB_dy;
-		// C_weight not needed explicitly
 
 		// initialize interpolated depth and color at the first pixel in this column
 		float pixel_distance = Az_minus_C * A_weight + Bz_minus_C * B_weight + Cz;
@@ -133,16 +155,30 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 			pixel_color_channel[color_channel] = Ccolor[color_channel] + Acolor_minus_C[color_channel] * A_weight + Bcolor_minus_C[color_channel] * B_weight;
 		}
 
+		float u = Cuv[0] + Auv_minus_C[0] * A_weight + Buv_minus_C[0] * B_weight;
+		float v = Cuv[1] + Auv_minus_C[1] * A_weight + Buv_minus_C[1] * B_weight;
+
 		int pixel_idx = y_min * frame_width + current_x;
 		for (int current_y = y_min; current_y <= y_max; current_y++) {
 			if (pixel_distance < z_buffer[pixel_idx]) {
 				z_buffer[pixel_idx] = pixel_distance;
 
 				Uint32 interpolated_color[4];
-				for (int color_ingrediant_idx = 0; color_ingrediant_idx < 4; color_ingrediant_idx++) {
-					interpolated_color[color_ingrediant_idx] = (Uint32)max(pixel_color_channel[color_ingrediant_idx], 0.0f);
+				if (has_texture && texture && texture->pixels) {
+					float corrected_u = max(u, 0.0f);
+					float corrected_v = max(v, 0.0f);
+
+					Color sample = texture_sample_nearest(texture, u, v);
+					interpolated_color[0] = sample.r;
+					interpolated_color[1] = sample.g;
+					interpolated_color[2] = sample.b;
+					interpolated_color[3] = sample.a;
 				}
-				// draw_pixel[pixel_idx] => rgba_to_uint32
+				else {
+					for (int color_channel = 0; color_channel < 4; color_channel++) {
+						interpolated_color[color_channel] = (Uint32)max(pixel_color_channel[color_channel], 0.0f);
+					}
+				}
 				frame[pixel_idx] = (interpolated_color[0] << 24) | (interpolated_color[1] << 16) | (interpolated_color[2] << 8) | interpolated_color[3];
 			}
 			// step one pixel down: update weights, depth and color using precomputed dy deltas
@@ -151,25 +187,23 @@ void _draw_triangle(Triangle triangle, vec3* vertices, Color* colors, Uint32* fr
 			pixel_distance += dz_dy;
 			for (int color_channel = 0; color_channel < 4; color_channel++)
 				pixel_color_channel[color_channel] += dcolor_dy[color_channel];
+			u += duv_dy[0];
+			v += duv_dy[1];
 			pixel_idx += frame_width;
 		}
 		// move x 1 unit right for edge functions
-		/*edge_function2 += slope2;
-		AC_function += AC_slope;*/
-
 		edge_function2 = glm_clamp(edge_function2 + slope2, edge_min_y, edge_max_y);
 		AC_function = glm_clamp(AC_function + AC_slope, ACy_min, ACy_max);
 	}
 }
 
-void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
+static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
 {
 	vec3* vertex_a = vertices[triangle->corner1_idx];
 	vec3* vertex_b = vertices[triangle->corner2_idx];
 	vec3* vertex_c = vertices[triangle->corner3_idx];
 
-	if ((*vertex_a)[0] <= (*vertex_b)[0] &&
-		(*vertex_a)[0] <= (*vertex_c)[0]) {
+	if ((*vertex_a)[0] <= (*vertex_b)[0] && (*vertex_a)[0] <= (*vertex_c)[0]) {
 		dest->corner1_idx = triangle->corner1_idx;
 		if ((*vertex_b)[0] <= (*vertex_c)[0]) {
 			dest->corner2_idx = triangle->corner2_idx;
@@ -180,8 +214,7 @@ void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
 			dest->corner3_idx = triangle->corner2_idx;
 		}
 	}
-	else if ((*vertex_b)[0] <= (*vertex_a)[0] &&
-		(*vertex_b)[0] <= (*vertex_c)[0]) {
+	else if ((*vertex_b)[0] <= (*vertex_a)[0] && (*vertex_b)[0] <= (*vertex_c)[0]) {
 		dest->corner1_idx = triangle->corner2_idx;
 		if ((*vertex_a)[0] <= (*vertex_c)[0]) {
 			dest->corner2_idx = triangle->corner1_idx;
@@ -205,14 +238,3 @@ void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
 	}
 }
 
-void _draw_pixel(Uint32* frame, Uint32 frame_width, Uint32 frame_height, Uint32 x, Uint32 y, Uint32* color)
-{
-	if (!_is_in_frame(x, y, frame_width, frame_height))
-		return;
-	frame[y * frame_width + x] = rgba_to_uint32(color[0], color[1], color[2], color[3]);
-}
-
-Uint32 _is_in_frame(Uint32 x, Uint32 y, Uint32 frame_width, Uint32 frame_height)
-{
-	return !(x < 0 || x >= frame_width || y < 0 || y >= frame_height);
-}
