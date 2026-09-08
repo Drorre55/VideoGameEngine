@@ -12,7 +12,11 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
 
 		(*vertex)[0] /= horizontal_scale * vertex_z;
 		(*vertex)[1] /= vertical_scale * vertex_z;
-		(*vertex)[2] = (vertex_z - VIEW_FRUSTUM_MIN) / (VIEW_FRUSTUM_MAX - VIEW_FRUSTUM_MIN);
+		// inverse z -> small_value = far, big_value = close
+		(*vertex)[2] = 1.f / vertex_z; //(vertex_z - VIEW_FRUSTUM_MIN) / (VIEW_FRUSTUM_MAX - VIEW_FRUSTUM_MIN);
+
+		world_objects->uvs[i][0] /= vertex_z;
+		world_objects->uvs[i][1] /= vertex_z;
 	}
 }
 

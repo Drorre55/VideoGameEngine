@@ -18,9 +18,12 @@ void backface_culling(WorldObjects* world_objects, Camera* camera)
 		glm_vec3_sub(vertex1, camera->global_coords, vertex_to_camera);
 
 		if (glm_vec3_dot(vertex_to_camera, normal) < 0) {
-			world_objects->triangles[i] = world_objects->triangles[
-				world_objects->num_triangles - 1];
+			world_objects->triangles[i] = 
+				world_objects->triangles[world_objects->num_triangles - 1];
+			world_objects->triangle_texture_indices[i] = 
+				world_objects->triangle_texture_indices[world_objects->num_triangles - 1];
 			world_objects->num_triangles--;
+			i--;
 		}
 	}
 }
@@ -61,6 +64,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	Color* clipped_colors = malloc(sizeof(Color) * maximum_vertices);
 	vec2* clipped_uvs = malloc(sizeof(vec2) * maximum_vertices);
 	Triangle* clipped_triangles = malloc(sizeof(Triangle) * maximum_triangles);
+	Uint32* clipped_texture_indices = malloc(sizeof(Uint32) * maximum_triangles);
 
 	if (clipped_vertices == NULL || clipped_colors == NULL || clipped_uvs == NULL || clipped_triangles == NULL) {
 		SDL_LogError(1, "Could not allocate memory for frustum clipping");
@@ -68,6 +72,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		free(clipped_colors);
 		free(clipped_uvs);
 		free(clipped_triangles);
+		free(clipped_texture_indices);
 		return;
 	}
 
@@ -121,6 +126,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 				free(clipped_colors);
 				free(clipped_uvs);
 				free(clipped_triangles);
+				free(clipped_texture_indices);
 				return;
 			}
 
@@ -148,6 +154,9 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			clipped_triangles[triangle_count].corner2_idx = second_index;
 			clipped_triangles[triangle_count].corner3_idx = third_index;
 
+			clipped_texture_indices[triangle_count] =
+				camera_space_objects->triangle_texture_indices[triangle_index];
+
 			triangle_count++;
 		}
 	}
@@ -156,11 +165,13 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	free(camera_space_objects->colors);
 	free(camera_space_objects->uvs);
 	free(camera_space_objects->triangles);
+	free(camera_space_objects->triangle_texture_indices);
 
 	camera_space_objects->vertices = clipped_vertices;
 	camera_space_objects->colors = clipped_colors;
 	camera_space_objects->uvs = clipped_uvs;
 	camera_space_objects->triangles = clipped_triangles;
+	camera_space_objects->triangle_texture_indices = clipped_texture_indices;
 	camera_space_objects->num_vertices = vertex_count;
 	camera_space_objects->num_triangles = triangle_count;
 }
@@ -173,7 +184,7 @@ static Uint32 _clip_polygon_against_plane(const ClipVertex* input, Uint32 input_
 
 	Uint32 output_count = 0;
 	// floating point errror tolerance
-	const float epsilon = 1e-6f;
+	const float epsilon = 0.f;//1e-6f;
 
 	for (Uint32 i = 0; i < input_count; i++) {
 		const ClipVertex* current = &input[i];

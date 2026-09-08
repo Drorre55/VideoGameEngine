@@ -3,6 +3,7 @@
 #include "stb_image.h"
 
 #include <string.h>
+#include <cglm/cglm.h>
 
 static inline Uint32 _texture_clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
 {
@@ -158,14 +159,17 @@ Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath)
 
 Color texture_sample_nearest(const Texture2D* texture, float u, float v)
 {
-    Color pixel = { 0, 0, 0, 255 };
+    //Color pixel = { 0, 0, 0, 255 };
     /*int checker =
         (((int)(u * 10.0f) & 1) ^
             ((int)(v * 10.0f) & 1));
 
     Color pixel = checker ? (Color) { 255, 255, 255, 255 } : (Color) { 0, 0, 0, 255 };*/
+    Uint8 r = (Uint8)(glm_clamp(u, 0.0f, 1.0f) * 255.0f);
+    Uint8 g = (Uint8)(glm_clamp(v, 0.0f, 1.0f) * 255.0f);
+    Color pixel = { r, g, 0, 255 };
 
-    if (!texture || !texture->pixels || texture->width == 0 || texture->height == 0) {
+    /*if (!texture || !texture->pixels || texture->width == 0 || texture->height == 0) {
         return pixel;
     }
 
@@ -179,7 +183,7 @@ Color texture_sample_nearest(const Texture2D* texture, float u, float v)
     pixel.r = texture->pixels[index + 0];
     pixel.g = texture->pixels[index + 1];
     pixel.b = texture->pixels[index + 2];
-    pixel.a = texture->pixels[index + 3];
+    pixel.a = texture->pixels[index + 3];*/
 
     return pixel;
 }
