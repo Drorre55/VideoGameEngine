@@ -4,8 +4,11 @@
 
 #define TEXTURE_NONE ((Uint32)-1)
 
-typedef struct {
-    Uint8 r, g, b, a;
+typedef union {
+    struct {
+        Uint8 r, g, b, a;
+    };
+    Uint8 iter[4];
 } Color;
 
 typedef struct {
@@ -33,3 +36,5 @@ Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath);
 
 Color texture_sample_nearest(const Texture2D* texture, float u, float v);
 Color texture_sample_bilinear(const Texture2D* texture, float u, float v);
+
+Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value);

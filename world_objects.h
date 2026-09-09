@@ -4,10 +4,13 @@
 #include "perlin_noise.h"
 #include "texture.h"
 
-typedef struct {
-	Uint32 corner1_idx;
-	Uint32 corner2_idx;
-	Uint32 corner3_idx;
+typedef union {
+	struct {
+		Uint32 corner1_idx;
+		Uint32 corner2_idx;
+		Uint32 corner3_idx;
+	};
+	Uint32 iter[3];
 } Triangle;
 
 typedef struct {

@@ -5,13 +5,6 @@
 #include <string.h>
 #include <cglm/cglm.h>
 
-static inline Uint32 _texture_clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
-{
-    if (value < min_value) return min_value;
-    if (value > max_value) return max_value;
-    return value;
-}
-
 Texture2D texture_load_from_file(const char* filepath)
 {
     Texture2D texture = { 0 };
@@ -192,9 +185,8 @@ Color texture_sample_bilinear(const Texture2D* texture, float u, float v)
 {
     Color pixel = { 0, 0, 0, 255 };
 
-    if (!texture || !texture->pixels || texture->width == 0 || texture->height == 0) {
+    if (!texture || !texture->pixels || texture->width == 0 || texture->height == 0)
         return pixel;
-    }
 
     float uu = u - floorf(u);
     float vv = v - floorf(v);
@@ -204,8 +196,8 @@ Color texture_sample_bilinear(const Texture2D* texture, float u, float v)
 
     Uint32 x0 = (Uint32)floorf(x);
     Uint32 y0 = (Uint32)floorf(y);
-    Uint32 x1 = _texture_clamp_u32(x0 + 1, 0, texture->width - 1);
-    Uint32 y1 = _texture_clamp_u32(y0 + 1, 0, texture->height - 1);
+    Uint32 x1 = clamp_u32(x0 + 1, 0, texture->width - 1);
+    Uint32 y1 = clamp_u32(y0 + 1, 0, texture->height - 1);
 
     float tx = x - (float)x0;
     float ty = y - (float)y0;
@@ -251,4 +243,11 @@ Color texture_sample_bilinear(const Texture2D* texture, float u, float v)
     pixel.a = (Uint8)(a0 + (a1 - a0) * ty);
 
     return pixel;
+}
+
+inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
+{
+    if (value < min_value) return min_value;
+    else if (value > max_value) return max_value;
+    return value;
 }
