@@ -9,6 +9,7 @@ SDL_AppResult user_events(Camera* camera, bool* show_fps, Uint32 window_width, U
 	while (SDL_PollEvent(&event)) {
 		switch (event.type) {
 		case SDL_EVENT_QUIT:
+			SDL_Log("Quit");
 			return SDL_APP_SUCCESS;
 
 			// TODO: Add events
@@ -27,6 +28,11 @@ SDL_AppResult user_events(Camera* camera, bool* show_fps, Uint32 window_width, U
 			if (event.key.key == SDLK_P && (event.key.mod & SDL_KMOD_CTRL)) {
 				*show_fps = !*show_fps;
 			}
+			if (event.key.key == SDLK_ESCAPE) {
+				SDL_Log("Esc");
+				return SDL_APP_SUCCESS;
+			}
+
 		}
 	}
 	return SDL_APP_CONTINUE;
