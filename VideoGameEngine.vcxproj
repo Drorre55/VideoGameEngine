@@ -189,6 +189,7 @@
     <None Include="Assets\tree\oak-a.mb" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="Assets\forest_ground_06_4k.blend\textures\forest_ground_06_diff_4k.jpg" />
     <Image Include="Assets\tree\textures\blue sky.png" />
     <Image Include="Assets\tree\textures\feuilles 1 D.tga" />
     <Image Include="Assets\tree\textures\feuilles 2 D.tga" />

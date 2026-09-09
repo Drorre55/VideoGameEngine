@@ -5,75 +5,131 @@
 #include <string.h>
 #include <cglm/cglm.h>
 
-Texture2D texture_load_from_file(const char* filepath)
+Texture texture_load_from_file(const char* filepath)
 {
-    Texture2D texture = { 0 };
-
-    if (!filepath) {
+    Texture texture = { 0 };
+    if (!filepath) 
         return texture;
-    }
+    
+    Mipmap mipmap = { 0 };
 
     int width = 0;
     int height = 0;
-    int channels_in_file = 0;
+    int placeholder = 0;
 
     // Force RGBA so renderer uses a consistent format.
-    unsigned char* pixels = stbi_load(filepath, &width, &height, &channels_in_file, 4);
+    Uint8* pixels = stbi_load(filepath, &width, &height, &placeholder, 4);
 
     if (!pixels) {
         SDL_LogError(1, "Failed to load texture: %s", filepath);
         return texture;
     }
 
-    texture.width = (Uint32)width;
-    texture.height = (Uint32)height;
-    texture.channels = 4;
-    texture.pixels = pixels;
+    mipmap.width = (Uint32)width;
+    mipmap.height = (Uint32)height;
+    mipmap.pixels = pixels;
+
+    texture.max_LOD = (Uint8)log2f(min(width, height));
+    texture.mipmaps[texture.max_LOD] = mipmap;
+    _generate_mipmaps(texture);
 
     return texture;
 }
 
-void texture_free(Texture2D* texture)
-{
-    if (!texture || !texture->pixels) {
-        return;
-    }
+// We assume square image in the power of 2
+static void _generate_mipmaps(Texture texture) {
+    Mipmap original_image = texture.mipmaps[texture.max_LOD];
+    for (Uint8 i = texture.max_LOD - 1; i >= 0; i--) {
+        Uint16 kernel_size = powf(2.f, (float)(texture.max_LOD - i));
+        Uint16 new_width = powf(2.f, (float)i);
 
-    stbi_image_free(texture->pixels);
-    texture->pixels = NULL;
-    texture->width = 0;
-    texture->height = 0;
-    texture->channels = 0;
+        Mipmap* mipmap = malloc(sizeof(Mipmap));
+        if (!mipmap) {
+            SDL_LogError(1, "Failed creating mipmap");
+            return;
+        }
+        Uint8* pixels = malloc(new_width * new_width * 4 * sizeof(Uint8));
+        if (!pixels) {
+            SDL_LogError(1, "Failed creating mipmap");
+            return;
+        }
+
+        for (Uint16 row = 0; row < new_width; row++) {
+            for (Uint16 col = 0; col < new_width; col++) {
+                float sum_r, sum_g, sum_b, sum_a;
+                sum_r = sum_g = sum_b = sum_a = 0;
+                for (Uint16 kernel_row = 0; kernel_row < kernel_size; kernel_row++) {
+                    for (Uint16 kernel_col = 0; kernel_col < kernel_size; kernel_col++) {
+                        Uint32 original_image_idx = (
+                            (row * kernel_size + kernel_row) * original_image.width 
+                            + col * kernel_size + kernel_col) * 4;
+                        sum_r += (float)original_image.pixels[original_image_idx + 0];
+                        sum_g += (float)original_image.pixels[original_image_idx + 1];
+                        sum_b += (float)original_image.pixels[original_image_idx + 2];
+                        sum_a += (float)original_image.pixels[original_image_idx + 3];
+                    }
+                }
+                Uint32 new_idx = (row * new_width + col) * 4;
+                pixels[new_idx + 0] = (Uint8) (sum_r / (kernel_size * kernel_size));
+                pixels[new_idx + 1] = (Uint8) (sum_g / (kernel_size * kernel_size));
+                pixels[new_idx + 2] = (Uint8) (sum_b / (kernel_size * kernel_size));
+                pixels[new_idx + 3] = (Uint8) (sum_a / (kernel_size * kernel_size));
+            }
+        }
+        mipmap->pixels = pixels;
+        mipmap->width = new_width;
+        mipmap->height = new_width;
+        texture.mipmaps[i] = *mipmap;
+    }
+}
+
+void texture_free(Texture* texture)
+{
+    if (!texture || texture->max_LOD == 0)
+        return;
+
+    for (Uint8 i = 0; i <= texture->max_LOD; i++) {
+        _mipmap_free(texture->mipmaps[i].pixels);
+    }
+    texture->mipmaps = NULL;
+    texture->max_LOD = 0;
+}
+
+static void _mipmap_free(Mipmap* mipmap)
+{
+    if (!mipmap || !mipmap->pixels)
+        return;
+
+    stbi_image_free(mipmap->pixels);
+    mipmap->pixels = NULL;
+    mipmap->width = 0;
+    mipmap->height = 0;
 }
 
 TextureBank texture_bank_create(Uint32 capacity)
 {
     TextureBank bank = { 0 };
 
-    if (capacity == 0) {
+    if (capacity == 0)
         capacity = 4;
-    }
-
+    
     bank.capacity = capacity;
-    bank.textures = malloc(sizeof(Texture2D) * bank.capacity);
+    bank.textures = malloc(sizeof(Texture) * bank.capacity);
     if (!bank.textures) {
         bank.capacity = 0;
         return bank;
     }
-
-    memset(bank.textures, 0, sizeof(Texture2D) * bank.capacity);
+    memset(bank.textures, 0, sizeof(Texture) * bank.capacity);
     return bank;
 }
 
 void texture_bank_free(TextureBank* bank)
 {
-    if (!bank) {
+    if (!bank)
         return;
-    }
 
-    for (Uint32 i = 0; i < bank->count; i++) {
+    for (Uint32 i = 0; i < bank->count; i++)
         texture_free(&bank->textures[i]);
-    }
 
     free(bank->textures);
     bank->textures = NULL;
@@ -81,23 +137,35 @@ void texture_bank_free(TextureBank* bank)
     bank->capacity = 0;
 }
 
-Texture2D texture_clone(const Texture2D* src)
+Texture texture_clone(const Texture src)
 {
-    Texture2D copy = { 0 };
-    if (!src) return copy;
+    Texture copy = { 0 };
+    copy.max_LOD = src.max_LOD;
 
-    copy.width = src->width;
-    copy.height = src->height;
-    copy.channels = src->channels;
+    if (src.mipmaps && copy.max_LOD > 0)
+        copy.mipmaps = malloc((copy.max_LOD + 1) * sizeof(Mipmap));
+        if (copy.mipmaps) {
+            for (Uint8 i = 0; i <= copy.max_LOD; i++) {
+                copy.mipmaps[i] = _mipmap_clone(src.mipmaps[i]);
+            }
+        }
+    return copy;
+}
 
-    if (src->pixels && src->width > 0 && src->height > 0 && src->channels > 0) {
-        size_t pixel_count = (size_t)src->width * (size_t)src->height * (size_t)src->channels;
-        copy.pixels = malloc(pixel_count);
+static Mipmap _mipmap_clone(const Mipmap src)
+{
+    Mipmap copy = { 0 };
+
+    copy.width = src.width;
+    copy.height = src.height;
+
+    if (src.pixels && src.width > 0 && src.height > 0) {
+        size_t pixel_count = (size_t)src.width * (size_t)src.height * 4;
+        copy.pixels = malloc(pixel_count * sizeof(Uint8));
         if (copy.pixels) {
-            memcpy(copy.pixels, src->pixels, pixel_count);
+            memcpy(copy.pixels, src.pixels, pixel_count);
         }
     }
-
     return copy;
 }
 
@@ -111,46 +179,45 @@ TextureBank texture_bank_deep_copy(const TextureBank* src)
 
     if (dst.count == 0) return dst;
 
-    dst.textures = calloc(dst.capacity ? dst.capacity : dst.count, sizeof(Texture2D));
+    dst.textures = calloc(dst.capacity ? dst.capacity : dst.count, sizeof(Texture));
     if (!dst.textures) return dst;
 
     for (Uint32 i = 0; i < src->count; i++) {
-        dst.textures[i] = texture_clone(&src->textures[i]);
+        dst.textures[i] = texture_clone(src->textures[i]);
     }
 
     return dst;
 }
 
-Uint32 texture_bank_add(TextureBank* bank, Texture2D texture) {
+Uint32 texture_bank_add(TextureBank* bank, Texture mipmap) {
     if (!bank->textures && bank->capacity == 0) {
         *bank = texture_bank_create(4);
     }
     if (bank->count + 1 >= bank->capacity) {
         Uint32 new_capacity = bank->capacity * 2;
-        Texture2D* resized = realloc(bank->textures, sizeof(Texture2D) * new_capacity);
+        Texture* resized = realloc(bank->textures, sizeof(Texture) * new_capacity);
         if (!resized) {
             return TEXTURE_NONE;
         }
 
         bank->textures = resized;
-        memset(&bank->textures[bank->capacity], 0, sizeof(Texture2D) * (new_capacity - bank->capacity));
+        memset(&bank->textures[bank->capacity], 0, sizeof(Texture) * (new_capacity - bank->capacity));
         bank->capacity = new_capacity;
     }
-    bank->textures[bank->count++] = texture;
+    bank->textures[bank->count++] = mipmap;
     return bank->count - 1;
 }
 
 Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath)
 {
-    Texture2D texture = texture_load_from_file(filepath);
-    if (!texture.pixels) {
+    Texture texture = texture_load_from_file(filepath);
+    if (texture.max_LOD == 0) {
         return TEXTURE_NONE;
     }
-
     return texture_bank_add(bank, texture);
 }
 
-Color texture_sample_nearest(const Texture2D* texture, float u, float v)
+Color texture_sample_nearest(const Mipmap mipmap, float u, float v)
 {
     //Color pixel = { 0, 0, 0, 255 };
     /*int checker =
@@ -181,51 +248,51 @@ Color texture_sample_nearest(const Texture2D* texture, float u, float v)
     return pixel;
 }
 
-Color texture_sample_bilinear(const Texture2D* texture, float u, float v)
+Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
 {
     Color pixel = { 0, 0, 0, 255 };
 
-    if (!texture || !texture->pixels || texture->width == 0 || texture->height == 0)
+    if (!mipmap.pixels || mipmap.width == 0 || mipmap.height == 0)
         return pixel;
 
     float uu = u - floorf(u);
     float vv = v - floorf(v);
 
-    float x = uu * (float)(texture->width - 1);
-    float y = vv * (float)(texture->height - 1);
+    float x = uu * (float)(mipmap.width - 1);
+    float y = vv * (float)(mipmap.height - 1);
 
     Uint32 x0 = (Uint32)floorf(x);
     Uint32 y0 = (Uint32)floorf(y);
-    Uint32 x1 = clamp_u32(x0 + 1, 0, texture->width - 1);
-    Uint32 y1 = clamp_u32(y0 + 1, 0, texture->height - 1);
+    Uint32 x1 = clamp_u32(x0 + 1, 0, mipmap.width - 1);
+    Uint32 y1 = clamp_u32(y0 + 1, 0, mipmap.height - 1);
 
     float tx = x - (float)x0;
     float ty = y - (float)y0;
 
-    Uint32 idx00 = (y0 * texture->width + x0) * 4;
-    Uint32 idx10 = (y0 * texture->width + x1) * 4;
-    Uint32 idx01 = (y1 * texture->width + x0) * 4;
-    Uint32 idx11 = (y1 * texture->width + x1) * 4;
+    Uint32 idx00 = (y0 * mipmap.width + x0) * 4;
+    Uint32 idx10 = (y0 * mipmap.width + x1) * 4;
+    Uint32 idx01 = (y1 * mipmap.width + x0) * 4;
+    Uint32 idx11 = (y1 * mipmap.width + x1) * 4;
 
-    float r00 = (float)texture->pixels[idx00 + 0];
-    float g00 = (float)texture->pixels[idx00 + 1];
-    float b00 = (float)texture->pixels[idx00 + 2];
-    float a00 = (float)texture->pixels[idx00 + 3];
+    float r00 = (float)mipmap.pixels[idx00 + 0];
+    float g00 = (float)mipmap.pixels[idx00 + 1];
+    float b00 = (float)mipmap.pixels[idx00 + 2];
+    float a00 = (float)mipmap.pixels[idx00 + 3];
 
-    float r10 = (float)texture->pixels[idx10 + 0];
-    float g10 = (float)texture->pixels[idx10 + 1];
-    float b10 = (float)texture->pixels[idx10 + 2];
-    float a10 = (float)texture->pixels[idx10 + 3];
+    float r10 = (float)mipmap.pixels[idx10 + 0];
+    float g10 = (float)mipmap.pixels[idx10 + 1];
+    float b10 = (float)mipmap.pixels[idx10 + 2];
+    float a10 = (float)mipmap.pixels[idx10 + 3];
 
-    float r01 = (float)texture->pixels[idx01 + 0];
-    float g01 = (float)texture->pixels[idx01 + 1];
-    float b01 = (float)texture->pixels[idx01 + 2];
-    float a01 = (float)texture->pixels[idx01 + 3];
+    float r01 = (float)mipmap.pixels[idx01 + 0];
+    float g01 = (float)mipmap.pixels[idx01 + 1];
+    float b01 = (float)mipmap.pixels[idx01 + 2];
+    float a01 = (float)mipmap.pixels[idx01 + 3];
 
-    float r11 = (float)texture->pixels[idx11 + 0];
-    float g11 = (float)texture->pixels[idx11 + 1];
-    float b11 = (float)texture->pixels[idx11 + 2];
-    float a11 = (float)texture->pixels[idx11 + 3];
+    float r11 = (float)mipmap.pixels[idx11 + 0];
+    float g11 = (float)mipmap.pixels[idx11 + 1];
+    float b11 = (float)mipmap.pixels[idx11 + 2];
+    float a11 = (float)mipmap.pixels[idx11 + 3];
 
     float r0 = r00 + (r10 - r00) * tx;
     float g0 = g00 + (g10 - g00) * tx;
@@ -250,4 +317,9 @@ inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
     if (value < min_value) return min_value;
     else if (value > max_value) return max_value;
     return value;
+}
+
+Color texture_sample_trilinear(const Texture texture, float u, float v)
+{
+    return texture_sample_bilinear(texture.mipmaps[texture.max_LOD], u, v);
 }

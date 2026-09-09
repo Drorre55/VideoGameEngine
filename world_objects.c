@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(100, 4, 10.f, "./Assets/tree/textures/sol-herbe.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(100, 4, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -177,15 +177,13 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     }
 
     obj->texture_bank = texture_bank_create(1);
-    Uint32 ground_texture_index = texture_bank_add_from_file(&obj->texture_bank, texture_path);
+    Uint32 terrain_texture_index = texture_bank_add_from_file(&obj->texture_bank, texture_path);
     for (Uint32 i = 0; i < obj->num_triangles; i++) {
-        obj->triangle_texture_indices[i] = ground_texture_index; //TEXTURE_NONE;
+        obj->triangle_texture_indices[i] = terrain_texture_index;
     }
-    // Temporary set all ground green
+    // Set fallback to green
     for (Uint32 i = 0; i < total_vertices; i++) {
         obj->colors[i] = (Color){ 0, 150, 0, 255 };
-        obj->colors[i].r = obj->uvs[i][0] * 255;
-        obj->colors[i].g = obj->uvs[i][1] * 255;
     }
     return obj;
 }
@@ -251,7 +249,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
             glm_vec2_copy(world_objects[i]->uvs[j], objects->uvs[concat_idx]);
         }
         for (Uint32 j = 0; j < world_objects[i]->texture_bank.count; j++) {
-            Texture2D tex_copy = texture_clone(&world_objects[i]->texture_bank.textures[j]);
+            Texture tex_copy = texture_clone(world_objects[i]->texture_bank.textures[j]);
             texture_bank_add(&objects->texture_bank, tex_copy);
         }
         for (Uint32 j = 0; j < world_objects[i]->num_triangles; j++) {

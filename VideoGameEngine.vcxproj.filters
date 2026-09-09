@@ -149,5 +149,8 @@
     <Image Include="Assets\tree\textures\sol-herbe.jpg">
       <Filter>Resource Files\tree\textures</Filter>
     </Image>
+    <Image Include="Assets\forest_ground_06_4k.blend\textures\forest_ground_06_diff_4k.jpg">
+      <Filter>Resource Files\tree\textures</Filter>
+    </Image>
   </ItemGroup>
 </Project>
