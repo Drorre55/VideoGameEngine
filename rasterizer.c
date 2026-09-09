@@ -22,6 +22,18 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_wid
 	free_world_objects(on_screen_objects);
 }
 
+static inline _calc_step_constants(float* A_variable, float* B_variable, float* C_variable, 
+    Uint32 num_variables, float dA_dx, float dA_dy, float dB_dx, float dB_dy, float* Avar_minus_C, 
+    float* Bvar_minus_C, float* dest_dvar_dx, float* dest_dvar_dy) 
+{
+    for (Uint32 i = 0; i < num_variables; i++) {
+        Avar_minus_C[i] = A_variable[i] - C_variable[i];
+        Bvar_minus_C[i] = B_variable[i] - C_variable[i];
+        dest_dvar_dx[i] = Avar_minus_C[i] * dA_dx + Bvar_minus_C[i] * dB_dx;
+        dest_dvar_dy[i] = Avar_minus_C[i] * dA_dy + Bvar_minus_C[i] * dB_dy;
+    }
+}
+
 static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
     vec3* vertices = world_objects->vertices;
@@ -35,11 +47,25 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
     vec3* A = vertices[sorted_triangle.corner1_idx];
     vec3* B = vertices[sorted_triangle.corner2_idx];
     vec3* C = vertices[sorted_triangle.corner3_idx];
+    vec4 A_color = { (float)colors[sorted_triangle.corner1_idx].r, (float)colors[sorted_triangle.corner1_idx].g,
+        (float)colors[sorted_triangle.corner1_idx].b, (float)colors[sorted_triangle.corner1_idx].a };
+    vec4 B_color = { (float)colors[sorted_triangle.corner2_idx].r, (float)colors[sorted_triangle.corner2_idx].g,
+        (float)colors[sorted_triangle.corner2_idx].b, (float)colors[sorted_triangle.corner2_idx].a };
+    vec4 C_color = { (float)colors[sorted_triangle.corner3_idx].r, (float)colors[sorted_triangle.corner3_idx].g,
+        (float)colors[sorted_triangle.corner3_idx].b, (float)colors[sorted_triangle.corner3_idx].a };
+    vec2* A_uv = uvs[sorted_triangle.corner1_idx];
+    vec2* B_uv = uvs[sorted_triangle.corner2_idx];
+    vec2* C_uv = uvs[sorted_triangle.corner3_idx];
 
     // Copy corner data to local variables for faster access
     float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
     float Ay = (*A)[1], By = (*B)[1], Cy = (*C)[1];
     float inv_Az = (*A)[2], inv_Bz = (*B)[2], inv_Cz = (*C)[2];
+
+    // Precompute edges
+    float ABx = Bx - Ax, ABy = By - Ay;
+    float ACx = Cx - Ax, ACy = Cy - Ay;
+    float BCx = Cx - Bx, BCy = Cy - By;
 
     /*
      * Degenerate triangle check.
@@ -47,7 +73,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
      * Sorting by X may change winding, but barycentric interpolation
      * still works as long as we preserve the resulting area sign.
      */
-    float triangle_area2 = (Bx - Ax) * (Cy - Ay) - (By - Ay) * (Cx - Ax);
+    float triangle_area2 = ABx * ACy - ABy * ACx;
 
     if (fabsf(triangle_area2) < 1e-8f)
         return;
@@ -65,49 +91,24 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
      * wC is implicit.
      */
 
-    float dA_dx = (By - Cy) * inverse_triangle_area;
-    float dA_dy = (Cx - Bx) * inverse_triangle_area;
+    float dA_dx = -BCy * inverse_triangle_area;
+    float dA_dy = BCx * inverse_triangle_area;
 
-    float dB_dx = (Cy - Ay) * inverse_triangle_area;
-    float dB_dy = (Ax - Cx) * inverse_triangle_area;
+    float dB_dx = ACy * inverse_triangle_area;
+    float dB_dy = -ACx * inverse_triangle_area;
+    
+    // Calc incremental progression constants
+    float inv_Az_minus_C, inv_Bz_minus_C, dz_dx, dz_dy;
+    _calc_step_constants(&inv_Az, &inv_Bz, &inv_Cz, 1, dA_dx, dA_dy, dB_dx, dB_dy, &inv_Az_minus_C, 
+        &inv_Bz_minus_C, &dz_dx, &dz_dy);
 
-    float inv_Az_minus_C = inv_Az - inv_Cz;
-    float inv_Bz_minus_C = inv_Bz - inv_Cz;
+    vec2 Auv_minus_C, Buv_minus_C, duv_dx, duv_dy;
+    _calc_step_constants(A_uv, B_uv, C_uv, 2, dA_dx, dA_dy, dB_dx, dB_dy, Auv_minus_C, Buv_minus_C, 
+        duv_dx, duv_dy);
 
-    // Incremental depth derivatives.
-    float dz_dx = inv_Az_minus_C * dA_dx + inv_Bz_minus_C * dB_dx;
-    float dz_dy = inv_Az_minus_C * dA_dy + inv_Bz_minus_C * dB_dy;
-
-    // UV derivatives
-    float Auv_minus_C[2];
-    float Buv_minus_C[2];
-    float duv_dx[2];
-    float duv_dy[2];
-    for (int uv = 0; uv < 2; uv++) {
-        Auv_minus_C[uv] = uvs[sorted_triangle.corner1_idx][uv] - uvs[sorted_triangle.corner3_idx][uv];
-        Buv_minus_C[uv] = uvs[sorted_triangle.corner2_idx][uv] - uvs[sorted_triangle.corner3_idx][uv];
-        duv_dx[uv] = Auv_minus_C[uv] * dA_dx + Buv_minus_C[uv] * dB_dx;
-        duv_dy[uv] = Auv_minus_C[uv] * dA_dy + Buv_minus_C[uv] * dB_dy;
-    }
-    // UV values used inside the main loop
-    float Cu = uvs[sorted_triangle.corner3_idx][0];
-    float Cv = uvs[sorted_triangle.corner3_idx][1];
-
-    // Color derivatives
-    float Acolor_minus_C[4], Bcolor_minus_C[4];
-    float dcolor_dx[4], dcolor_dy[4];
-    Uint8* Ccolor = (Uint8*)&colors[sorted_triangle.corner3_idx];
-    for (int channel = 0; channel < 4; channel++) {
-        float Acolor_channel = ((Uint8*)&colors[sorted_triangle.corner1_idx])[channel];
-        float Bcolor_channel = ((Uint8*)&colors[sorted_triangle.corner2_idx])[channel];
-        float Ccolor_channel = Ccolor[channel];
-
-        Acolor_minus_C[channel] = Acolor_channel - Ccolor_channel;
-        Bcolor_minus_C[channel] = Bcolor_channel - Ccolor_channel;
-
-        dcolor_dx[channel] = Acolor_minus_C[channel] * dA_dx + Bcolor_minus_C[channel] * dB_dx;
-        dcolor_dy[channel] = Acolor_minus_C[channel] * dA_dy + Bcolor_minus_C[channel] * dB_dy;
-    }
+    vec4 Acolor_minus_C, Bcolor_minus_C, dcolor_dx, dcolor_dy;
+    _calc_step_constants(A_color, B_color, C_color, 4, dA_dx, dA_dy, dB_dx, dB_dy, Acolor_minus_C, 
+        Bcolor_minus_C, dcolor_dx, dcolor_dy);
 
     const int has_texture =
         world_objects->triangle_texture_indices &&
@@ -140,19 +141,11 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
      * BC for B -> C
      * ----------------------------------------------------------------
      */
-    float AB_dx = Bx - Ax;
-    float AB_dy = By - Ay;
-
-    float AC_dx = Cx - Ax;
-    float AC_dy = Cy - Ay;
-
-    float BC_dx = Cx - Bx;
-    float BC_dy = Cy - By;
 
     // Slopes dy/dx.
-    float AB_slope = fabsf(AB_dx) > 1e-8f ? AB_dy / AB_dx : 0.0f;
-    float AC_slope = fabsf(AC_dx) > 1e-8f ? AC_dy / AC_dx : 0.0f;
-    float BC_slope = fabsf(BC_dx) > 1e-8f ? BC_dy / BC_dx : 0.0f;
+    float AB_slope = fabsf(ABx) > 1e-8f ? ABy / ABx : 0.0f;
+    float AC_slope = fabsf(ACx) > 1e-8f ? ACy / ACx : 0.0f;
+    float BC_slope = fabsf(BCx) > 1e-8f ? BCy / BCx : 0.0f;
 
     // Pixel-center column bounds. A pixel column x represents samples at x + 0.5.
     int start_x = (int)ceilf(Ax - 0.5f);
@@ -207,17 +200,19 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
         if (y_min <= y_max) {
             // Initialize barycentric coordinates at first pixel center
             float first_pixel_center_y = (float)y_min + 0.5f;
-            float A_weight = ((first_pixel_center_x - Cx) * dA_dx) + ((first_pixel_center_y - Cy) * dA_dy);
-            float B_weight = ((first_pixel_center_x - Cx) * dB_dx) + ((first_pixel_center_y - Cy) * dB_dy);
+            float first_x_minus_C = first_pixel_center_x - Cx;
+            float first_y_minus_C = first_pixel_center_y - Cy;
+            float A_weight = (first_x_minus_C * dA_dx) + (first_y_minus_C * dA_dy);
+            float B_weight = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
 
             float interpolated_depth = inv_Cz + inv_Az_minus_C * A_weight + inv_Bz_minus_C * B_weight;
 
-            float u = Cu + Auv_minus_C[0] * A_weight + Buv_minus_C[0] * B_weight;
-            float v = Cv + Auv_minus_C[1] * A_weight + Buv_minus_C[1] * B_weight;
+            float u = (*C_uv)[0] + Auv_minus_C[0] * A_weight + Buv_minus_C[0] * B_weight;
+            float v = (*C_uv)[1] + Auv_minus_C[1] * A_weight + Buv_minus_C[1] * B_weight;
 
             float pixel_color_channel[4];
             for (int channel = 0; channel < 4; channel++) {
-                pixel_color_channel[channel] = Ccolor[channel]
+                pixel_color_channel[channel] = C_color[channel]
                     + Acolor_minus_C[channel] * A_weight
                     + Bcolor_minus_C[channel] * B_weight;
             }
@@ -229,29 +224,21 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                 if (interpolated_depth > z_buffer[pixel_idx]) {
                     z_buffer[pixel_idx] = interpolated_depth;
 
-                    Uint32 interpolated_color[4];
+                    Color interpolated_color;
                     if (has_texture && texture && texture->pixels)
                     {
                         float interpolated_u = u / interpolated_depth;
                         float interpolated_v = v / interpolated_depth;
-
-                        Color sample = texture_sample_bilinear(texture, interpolated_u, interpolated_v);
-                        interpolated_color[0] = sample.r;
-                        interpolated_color[1] = sample.g;
-                        interpolated_color[2] = sample.b;
-                        interpolated_color[3] = sample.a;
+                        interpolated_color = texture_sample_bilinear(texture, interpolated_u, interpolated_v);
                     }
                     else {
-                        interpolated_color[0] = (Uint32)glm_clamp(pixel_color_channel[0], 0.f, 255.f);
-                        interpolated_color[1] = (Uint32)glm_clamp(pixel_color_channel[1], 0.f, 255.f);
-                        interpolated_color[2] = (Uint32)glm_clamp(pixel_color_channel[2], 0.f, 255.f);
-                        interpolated_color[3] = (Uint32)glm_clamp(pixel_color_channel[3], 0.f, 255.f);
+                        glm_vec4_clamp(pixel_color_channel, 0.f, 255.f);
+                        interpolated_color.r = (Uint8)pixel_color_channel[0];
+                        interpolated_color.g = (Uint8)pixel_color_channel[1];
+                        interpolated_color.b = (Uint8)pixel_color_channel[2];
+                        interpolated_color.a = (Uint8)pixel_color_channel[3];
                     }
-                    frame[pixel_idx] =
-                        (interpolated_color[0] << 24) |
-                        (interpolated_color[1] << 16) |
-                        (interpolated_color[2] << 8) |
-                        interpolated_color[3];
+                    frame[pixel_idx] = _color_to_uint32(interpolated_color);
                 }
                 // Step down 1 pixel
                 A_weight += dA_dy;
@@ -310,6 +297,10 @@ static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices
 			dest->corner3_idx = triangle->corner1_idx;
 		}
 	}
+}
+
+static inline Uint32 _color_to_uint32(Color color) {
+    return (color.r << 24) | (color.g << 16) | (color.b << 8) | color.a;
 }
 
 static void _draw_triangle_test_reference(
