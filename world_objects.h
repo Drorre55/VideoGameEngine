@@ -31,3 +31,4 @@ float _normalize_to_01(float a, float b);
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects);
 void free_world_objects(WorldObjects* world_objects, bool deep_free_textures);
 WorldObjects* world_objects_deep_copy(const WorldObjects* world_objects, bool deep_copy_textures);
+void world_objects_assign_to_copy(const WorldObjects* src, WorldObjects* dest);

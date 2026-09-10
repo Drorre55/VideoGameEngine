@@ -205,6 +205,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
             float B_weight = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
 
             float interpolated_depth = inv_Cz + inv_Az_minus_C * A_weight + inv_Bz_minus_C * B_weight;
+            float inv_interp_depth = 1.f / interpolated_depth;
 
             float u = (*C_uv)[0] + Auv_minus_C[0] * A_weight + Buv_minus_C[0] * B_weight;
             float v = (*C_uv)[1] + Auv_minus_C[1] * A_weight + Buv_minus_C[1] * B_weight;
@@ -224,11 +225,14 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                     z_buffer[pixel_idx] = interpolated_depth;
 
                     Color interpolated_color;
-                    if (has_texture && texture.max_LOD > 0)
+                    if (has_texture && texture.num_levels > 0)
                     {
                         float interpolated_u = u / interpolated_depth;
                         float interpolated_v = v / interpolated_depth;
-                        interpolated_color = texture_sample_trilinear(texture, interpolated_u, interpolated_v, duv_dx, duv_dy);
+                        vec2 scaled_duv_dx, scaled_duv_dy;
+                        glm_vec2_scale(duv_dx, inv_interp_depth, scaled_duv_dx);
+                        glm_vec2_scale(duv_dy, inv_interp_depth, scaled_duv_dy);
+                        interpolated_color = texture_sample_trilinear(texture, interpolated_u, interpolated_v, scaled_duv_dx, scaled_duv_dy);
                     }
                     else {
                         glm_vec4_clamp(pixel_color_channel, 0.f, 255.f);

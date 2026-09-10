@@ -362,3 +362,17 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src, bool deep_copy_te
     }
     return copy;
 }
+
+void world_objects_assign_to_copy(const WorldObjects* src, WorldObjects* dest) {
+    if (!src) return;
+
+    dest->num_vertices = src->num_vertices;
+    dest->num_triangles = src->num_triangles;
+    dest->texture_bank = src->texture_bank;
+
+    memcpy(dest->vertices, src->vertices, sizeof(vec3) * src->num_vertices);
+    memcpy(dest->triangles, src->triangles, sizeof(Triangle) * src->num_triangles);
+    memcpy(dest->colors, src->colors, sizeof(Color) * src->num_vertices);
+    memcpy(dest->uvs, src->uvs, sizeof(vec2) * src->num_vertices);
+    memcpy(dest->triangle_texture_indices, src->triangle_texture_indices, sizeof(Uint32) * src->num_triangles);
+}

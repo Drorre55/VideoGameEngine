@@ -18,7 +18,7 @@ typedef struct {
 
 typedef struct {
     Mipmap* mipmaps;
-    Uint8 max_LOD;
+    Uint8 num_levels;
 } Texture;
 
 typedef struct {

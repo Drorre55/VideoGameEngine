@@ -30,7 +30,7 @@ static SDL_Renderer* renderer = NULL;
 
 static Uint32* framebuffer;
 float* z_buffer;
-static WorldObjects* world_objects;
+static WorldObjects *world_objects, *world_objects_render_copy;
 static Camera* camera;
 
 bool show_fps;
@@ -146,6 +146,7 @@ SDL_AppResult shutdown() {
 
 SDL_AppResult load_world() {
 	world_objects = load_world_objects();
+	world_objects_render_copy = world_objects_deep_copy(world_objects, false);
 	camera = load_camera(WINDOW_WIDTH, WINDOW_HEIGHT);
 
 	return SDL_APP_CONTINUE;
@@ -192,7 +193,8 @@ SDL_AppResult render(int fps) {
 			framebuffer[row * WINDOW_WIDTH + column] = (0 << 24) | (0 << 16) | (255 << 8) | 200;
 		}
 	}
-	run_graphics_pipeline(framebuffer, z_buffer, world_objects, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
+	world_objects_assign_to_copy(world_objects, world_objects_render_copy);
+	run_graphics_pipeline(framebuffer, z_buffer, world_objects_render_copy, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
 	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(Uint32));
 
 	SDL_RenderClear(renderer);

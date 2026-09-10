@@ -29,9 +29,9 @@ Texture texture_load_from_file(const char* filepath)
     mipmap.height = (Uint32)height;
     mipmap.pixels = pixels;
 
-    texture.max_LOD = (Uint8)log2f(min(width, height));
-    texture.mipmaps = malloc((texture.max_LOD + 1) * sizeof(Mipmap));
-    texture.mipmaps[texture.max_LOD] = mipmap;
+    texture.num_levels = (Uint8)log2f(min(width, height)) + 1;
+    texture.mipmaps = malloc(texture.num_levels * sizeof(Mipmap));
+    texture.mipmaps[0] = mipmap;
     _generate_mipmaps(texture);
 
     return texture;
@@ -39,10 +39,10 @@ Texture texture_load_from_file(const char* filepath)
 
 // We assume square image in the power of 2
 static void _generate_mipmaps(Texture texture) {
-    Mipmap original_image = texture.mipmaps[texture.max_LOD];
-    for (Uint8 i = 0; i < texture.max_LOD; i++) {
-        Uint16 kernel_size = powf(2.f, (float)(texture.max_LOD - i));
-        Uint16 new_width = powf(2.f, (float)i);
+    Mipmap original_image = texture.mipmaps[0];
+    for (Uint8 i = 1; i < texture.num_levels; i++) {
+        Uint16 new_width = 1 << (texture.num_levels - 1 - i); // 2^(texture.num_levels - i)
+        Uint16 kernel_size = 1 << i; // 2^i
 
         Mipmap* mipmap = malloc(sizeof(Mipmap));
         if (!mipmap) {
@@ -86,14 +86,14 @@ static void _generate_mipmaps(Texture texture) {
 
 void texture_free(Texture* texture)
 {
-    if (!texture || texture->max_LOD == 0)
+    if (!texture || texture->num_levels == 0)
         return;
 
-    for (Uint8 i = 0; i <= texture->max_LOD; i++) {
+    for (Uint8 i = 0; i < texture->num_levels; i++) {
         _mipmap_free(&texture->mipmaps[i]);
     }
     texture->mipmaps = NULL;
-    texture->max_LOD = 0;
+    texture->num_levels = 0;
 }
 
 static void _mipmap_free(Mipmap* mipmap)
@@ -141,12 +141,12 @@ void texture_bank_free(TextureBank* bank)
 Texture texture_clone(const Texture src)
 {
     Texture copy = { 0 };
-    copy.max_LOD = src.max_LOD;
+    copy.num_levels = src.num_levels;
 
-    if (src.mipmaps && copy.max_LOD > 0)
-        copy.mipmaps = malloc((copy.max_LOD + 1) * sizeof(Mipmap));
+    if (src.mipmaps && copy.num_levels > 0)
+        copy.mipmaps = malloc(copy.num_levels * sizeof(Mipmap));
         if (copy.mipmaps) {
-            for (Uint8 i = 0; i <= copy.max_LOD; i++) {
+            for (Uint8 i = 0; i < copy.num_levels; i++) {
                 copy.mipmaps[i] = _mipmap_clone(src.mipmaps[i]);
             }
         }
@@ -212,7 +212,7 @@ Uint32 texture_bank_add(TextureBank* bank, Texture mipmap) {
 Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath)
 {
     Texture texture = texture_load_from_file(filepath);
-    if (texture.max_LOD == 0) {
+    if (texture.num_levels == 0) {
         return TEXTURE_NONE;
     }
     return texture_bank_add(bank, texture);
@@ -322,26 +322,44 @@ inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
 
 Color texture_sample_trilinear(const Texture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
 {
-    Mipmap original_image = texture.mipmaps[texture.max_LOD];
-    float size = max(fabsf(duv_dx[0] * original_image.width) + fabsf(duv_dx[1] * original_image.width), fabsf(duv_dy[0] * original_image.width) + fabsf(duv_dy[1] * original_image.width));
+    Mipmap original_image = texture.mipmaps[0];
 
-    float log_size = texture.max_LOD - log2f(size);
-    if (log_size >= texture.max_LOD) 
-        return texture_sample_bilinear(texture.mipmaps[texture.max_LOD], u, v);
+    float tex_w = (float)original_image.width;
+    float tex_h = (float)original_image.height;
+
+    // Derivatives in texel space
+    float du_dx = fabsf(duv_dx[0] * tex_w);
+    float dv_dx = fabsf(duv_dx[1] * tex_h);
+    float du_dy = fabsf(duv_dy[0] * tex_w);
+    float dv_dy = fabsf(duv_dy[1] * tex_h);
+
+    // Standard footprint estimate: use the larger of the two projected lengths
+    float length_x = sqrtf(du_dx * du_dx + dv_dx * dv_dx);
+    float length_y = sqrtf(du_dy * du_dy + dv_dy * dv_dy);
+    float rho = fmaxf(length_x, length_y);
+
+    float lod = log2f(fmax(rho, 1.f));
+    lod = glm_clamp(lod, 0.f, (float)texture.num_levels - 1);
     
+    Uint32 low_mipmap = floorf(lod);
+    Uint32 high_mipmap = ceilf(lod);
+
+    low_mipmap = clamp_u32(low_mipmap, 0, texture.num_levels - 1);
+    high_mipmap = clamp_u32(high_mipmap, 0, texture.num_levels - 1);
+    
+    if (low_mipmap == high_mipmap)
+        return texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
+    
+    Color low_mipmap_color = texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
+    Color high_mipmap_color = texture_sample_bilinear(texture.mipmaps[high_mipmap], u, v);
+
     Color pixel = { 0, 0, 0, 255 };
 
-    Uint8 small_mipmap_LOD = floorf(log_size);
-    Uint8 large_mipmap_LOD = ceilf(log_size);
-    Color small_mipmap_color = texture_sample_bilinear(texture.mipmaps[small_mipmap_LOD], u, v);
-    Color large_mipmap_color = texture_sample_bilinear(texture.mipmaps[large_mipmap_LOD], u, v);
-
-    float t = (size - powf(2.f, texture.max_LOD - small_mipmap_LOD)) / (powf(2.f, texture.max_LOD - large_mipmap_LOD) - powf(2.f, texture.max_LOD - small_mipmap_LOD));
-
-    pixel.r = (Uint8)glm_lerp(small_mipmap_color.r, large_mipmap_color.r, t);
-    pixel.g = (Uint8)glm_lerp(small_mipmap_color.g, large_mipmap_color.g, t);
-    pixel.b = (Uint8)glm_lerp(small_mipmap_color.b, large_mipmap_color.b, t);
-    pixel.a = (Uint8)glm_lerp(small_mipmap_color.a, large_mipmap_color.a, t);
+    float t = lod - low_mipmap;
+    pixel.r = (Uint8)glm_lerp(low_mipmap_color.r, high_mipmap_color.r, t);
+    pixel.g = (Uint8)glm_lerp(low_mipmap_color.g, high_mipmap_color.g, t);
+    pixel.b = (Uint8)glm_lerp(low_mipmap_color.b, high_mipmap_color.b, t);
+    pixel.a = (Uint8)glm_lerp(low_mipmap_color.a, high_mipmap_color.a, t);
 
     return pixel;
 }
