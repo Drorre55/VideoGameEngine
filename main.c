@@ -137,7 +137,7 @@ SDL_AppResult shutdown() {
 
 	free(framebuffer);
 	free(z_buffer);
-	free_world_objects(world_objects);
+	free_world_objects(world_objects, true);
 	free_camera(camera);
 
 	SDL_Quit();

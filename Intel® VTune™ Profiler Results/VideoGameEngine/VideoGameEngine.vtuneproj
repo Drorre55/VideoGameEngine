@@ -249,6 +249,16 @@
      <recursive type="bool">true</recursive>
      <priority type="bool">false</priority>
     </searchDirectory>
+    <searchDirectory>
+     <name>srv*C:\Users\Dror\AppData\Local\Temp\SymbolCache*;https://msdl.microsoft.com/download/symbols</name>
+     <recursive type="bool">true</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+    <searchDirectory>
+     <name>C:\Users\Dror\AppData\Local\Temp\SymbolCache</name>
+     <recursive type="bool">true</recursive>
+     <priority type="bool">true</priority>
+    </searchDirectory>
    </searchCategory>
    <searchCategory>
     <category type="u8_t">3</category>
@@ -334,6 +344,30 @@
   </searchDirs>
  </vs_search_dirs>
  <All_Configurations-All_Platforms>
+  <searchDirs>
+   <searchCategory>
+    <category type="u8_t">1</category>
+    <searchDirectory>
+     <name>srv*C:\Windows Binary and Symbols*https://msdl.microsoft.com/download/symbols</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+   </searchCategory>
+   <searchCategory>
+    <category type="u8_t">2</category>
+    <searchDirectory>
+     <name>srv*C:\Windows Binary and Symbols*https://msdl.microsoft.com/download/symbols</name>
+     <recursive type="bool">false</recursive>
+     <priority type="bool">false</priority>
+    </searchDirectory>
+   </searchCategory>
+   <searchCategory>
+    <category type="u8_t">3</category>
+   </searchCategory>
+   <searchCategory>
+    <category type="u8_t">4</category>
+   </searchCategory>
+  </searchDirs>
   <target_settings>
    <inherited_state type="bool">false</inherited_state>
    <selected_workload>
@@ -354,7 +388,7 @@
        <context>
         <contextValue>
          <id>allowMultipleRuns</id>
-         <value type="bool">false</value>
+         <value type="bool">true</value>
         </contextValue>
         <contextValue>
          <id>analyzeKvmGuest</id>
@@ -451,7 +485,7 @@
    </workloads>
   </target_settings>
   <analysis_type_settings>
-   <selected_analysis_type_path>C:\Program Files (x86)\Intel\oneAPI\vtune\2026.4\config\analysis_type\survey.cfg</selected_analysis_type_path>
+   <selected_analysis_type_path>C:\Program Files (x86)\Intel\oneAPI\vtune\2026.4\config\analysis_type\hotspots.cfg</selected_analysis_type_path>
    <localhost>
     <launch>
      <at_start_point>
@@ -496,6 +530,55 @@
        <contextValue>
         <id>useGpuCountingMode</id>
         <value type="bool">true</value>
+       </contextValue>
+      </knob_values>
+     </at_start_point>
+     <at_start_point>
+      <at_path>C:\Program Files (x86)\Intel\oneAPI\vtune\2026.4\config\analysis_type\hotspots.cfg</at_path>
+      <knob_values>
+       <contextValue>
+        <id>allowedViewpoints</id>
+        <value>%HotspotsByCPUUsageViewpointName,%TasksOverviewViewpointName</value>
+       </contextValue>
+       <contextValue>
+        <id>enableCharacterizationInsights</id>
+        <value type="bool">true</value>
+       </contextValue>
+       <contextValue>
+        <id>enableStackCollect</id>
+        <value type="bool">false</value>
+       </contextValue>
+       <contextValue>
+        <id>goodFastFrameThreshold</id>
+        <value type="double">100</value>
+       </contextValue>
+       <contextValue>
+        <id>groupForCustomControl</id>
+        <value type="null"></value>
+       </contextValue>
+       <contextValue>
+        <id>initialViewpoint</id>
+        <value>%HotspotsByCPUUsageViewpointName</value>
+       </contextValue>
+       <contextValue>
+        <id>ittDomainFilterAT</id>
+        <value>all</value>
+       </contextValue>
+       <contextValue>
+        <id>samplingInterval</id>
+        <value type="double">1</value>
+       </contextValue>
+       <contextValue>
+        <id>samplingMode</id>
+        <value>sw</value>
+       </contextValue>
+       <contextValue>
+        <id>slowGoodFrameThreshold</id>
+        <value type="double">40</value>
+       </contextValue>
+       <contextValue>
+        <id>stackSizeCollect</id>
+        <value>0</value>
        </contextValue>
       </knob_values>
      </at_start_point>

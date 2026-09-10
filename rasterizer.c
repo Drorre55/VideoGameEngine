@@ -19,7 +19,6 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_wid
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
 		_draw_triangle(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
 	}
-	free_world_objects(on_screen_objects);
 }
 
 static inline _calc_step_constants(float* A_variable, float* B_variable, float* C_variable, 

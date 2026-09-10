@@ -13,7 +13,7 @@ WorldObjects* load_world_objects() {
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
-    free_world_objects(test_scene);
+    free_world_objects(test_scene, false);
     //free_world_objects(tree);
     free(terrain_mesh);
 
@@ -194,7 +194,7 @@ float _normalize_to_01(float a, float b) {
 
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects)
 {
-    WorldObjects* objects = world_objects_deep_copy(world_objects[0]);
+    WorldObjects* objects = world_objects_deep_copy(world_objects[0], false);
 
     for (Uint8 i = 1; i < num_objects; i++) {
         Uint32 concat_num_vertices = objects->num_vertices + world_objects[i]->num_vertices;
@@ -280,7 +280,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
     return objects;
 }
 
-void free_world_objects(WorldObjects* world_objects)
+void free_world_objects(WorldObjects* world_objects, bool deep_free_textures)
 {
     if (!world_objects) return;
 
@@ -289,7 +289,10 @@ void free_world_objects(WorldObjects* world_objects)
     free(world_objects->colors);
     free(world_objects->uvs);
     free(world_objects->triangle_texture_indices);
-    texture_bank_free(&world_objects->texture_bank);
+    if (deep_free_textures)
+        texture_bank_free(&world_objects->texture_bank);
+    else
+        world_objects->texture_bank.textures = NULL;
 
     world_objects->vertices = NULL;
     world_objects->triangles = NULL;
@@ -303,7 +306,7 @@ void free_world_objects(WorldObjects* world_objects)
     world_objects = NULL;
 }
 
-WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
+WorldObjects* world_objects_deep_copy(const WorldObjects* src, bool deep_copy_textures) {
     if (!src) return NULL;
 
     WorldObjects* copy = malloc(sizeof(WorldObjects));
@@ -315,12 +318,12 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
     copy->vertices = NULL;
     copy->triangles = NULL;
     copy->colors = NULL;
-    copy->texture_bank = texture_bank_deep_copy(&src->texture_bank);
+    copy->texture_bank = deep_copy_textures ? texture_bank_deep_copy(&src->texture_bank) : src->texture_bank;
 
     if (src->num_vertices > 0 && src->vertices != NULL) {
         copy->vertices = malloc(sizeof(vec3) * src->num_vertices);
         if (!copy->vertices) {
-            free_world_objects(copy);
+            free_world_objects(copy, deep_copy_textures);
             return NULL;
         }
         memcpy(copy->vertices, src->vertices, sizeof(vec3) * src->num_vertices);
@@ -328,7 +331,7 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
     if (src->num_triangles > 0 && src->triangles != NULL) {
         copy->triangles = malloc(sizeof(Triangle) * src->num_triangles);
         if (!copy->triangles) {
-            free_world_objects(copy);
+            free_world_objects(copy, deep_copy_textures);
             return NULL;
         }
         memcpy(copy->triangles, src->triangles, sizeof(Triangle) * src->num_triangles);
@@ -336,7 +339,7 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
     if (src->num_vertices > 0 && src->colors != NULL) {
         copy->colors = malloc(sizeof(Color) * src->num_vertices);
         if (!copy->colors) {
-            free_world_objects(copy);
+            free_world_objects(copy, deep_copy_textures);
             return NULL;
         }
         memcpy(copy->colors, src->colors, sizeof(Color) * src->num_vertices);
@@ -344,7 +347,7 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
     if (src->num_vertices > 0 && src->uvs != NULL) {
         copy->uvs = malloc(sizeof(vec2) * src->num_vertices);
         if (!copy->uvs) {
-            free_world_objects(copy);
+            free_world_objects(copy, deep_copy_textures);
             return NULL;
         }
         memcpy(copy->uvs, src->uvs, sizeof(vec2) * src->num_vertices);
@@ -352,7 +355,7 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src) {
     if (src->num_triangles > 0 && src->triangle_texture_indices != NULL) {
         copy->triangle_texture_indices = malloc(sizeof(Uint32) * src->num_triangles);
         if (!copy->triangle_texture_indices) {
-            free_world_objects(copy);
+            free_world_objects(copy, deep_copy_textures);
             return NULL;
         }
         memcpy(copy->triangle_texture_indices, src->triangle_texture_indices, sizeof(Uint32) * src->num_triangles);
