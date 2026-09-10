@@ -1,12 +1,28 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "SDL3/SDL.h"
 #include "world_objects.h"
 #include "graphics_pipeline.h"
 #include "user_input.h"
 
+// Usage:
+//   ./engine                  normal interactive mode
+//   ./engine --benchmark      deterministic 10s benchmark, then exits
+//   ./engine --benchmark=20   same, but runs for 20s instead of 10s
+//
+// Benchmark camera script: holds still for the first 5s (isolates raw
+// rasterizer/pipeline cost), then rotates at a fixed speed for the rest
+// of the run (exercises movement-triggered work, e.g. culling), so every
+// run does exactly the same thing and VTune results are comparable
+// before/after a code change.
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
+
+#define BENCHMARK_DEFAULT_DURATION_MS 10000
+#define BENCHMARK_STILL_PHASE_MS 5000
+#define BENCHMARK_ROTATE_SPEED_RAD_PER_SEC 0.5f  // slow pan, ~28.6 deg/sec
 
 static SDL_Window* window = NULL;
 static SDL_Texture* texture = NULL;
@@ -19,6 +35,63 @@ static Camera* camera;
 
 bool show_fps;
 
+// --- benchmark state ---
+static bool benchmark_mode = false;
+static Uint32 benchmark_duration_ms = BENCHMARK_DEFAULT_DURATION_MS;
+static Uint64 benchmark_start_time = 0;
+static Uint64 benchmark_frame_count = 0;
+static float benchmark_min_frame_ms = 1e9f;
+static float benchmark_max_frame_ms = 0.0f;
+static double benchmark_frame_ms_sum = 0.0;
+
+
+static void parse_args(int argc, char* argv[]) {
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--benchmark") == 0) {
+			benchmark_mode = true;
+		}
+		else if (strncmp(argv[i], "--benchmark=", 12) == 0) {
+			benchmark_mode = true;
+			benchmark_duration_ms = (Uint32)(atof(argv[i] + 12) * 1000.0);
+		}
+	}
+}
+
+/*
+ * Deterministic yaw-only rotation, reusing the existing mouse-look API.
+ * move_camera_direction() expects a pixel delta (relative_x/relative_y)
+ * scaled internally by FOV and window size, so we back-solve for the
+ * synthetic relative_x that produces exactly BENCHMARK_ROTATE_SPEED_RAD_PER_SEC
+ * radians of yaw this frame, independent of frame rate. relative_y stays 0,
+ * so pitch (x_axis rotation of y/z direction vectors) never changes.
+ */
+static void benchmark_update_camera(Camera* cam, Uint64 elapsed_ms, float delta_time) {
+	if (elapsed_ms < BENCHMARK_STILL_PHASE_MS) {
+		return; // still phase: hold position
+	}
+
+	float rotation_rad = BENCHMARK_ROTATE_SPEED_RAD_PER_SEC * delta_time;
+	float full_horizontal_fov = cam->field_of_view->x_degree_from_center * 2.0f;
+	float synthetic_relative_x = rotation_rad * (float)WINDOW_WIDTH / full_horizontal_fov;
+
+	move_camera_direction(synthetic_relative_x, 0.0f, cam, WINDOW_WIDTH, WINDOW_HEIGHT);
+}
+
+static void print_benchmark_summary(Uint64 elapsed_ms) {
+	// printf, not SDL_Log: we mute SDL_LOG_CATEGORY_APPLICATION for the
+	// timed loop below (see main), and this should print regardless.
+	if (benchmark_frame_count == 0) {
+		printf("benchmark: no frames were rendered in %llu ms\n", (unsigned long long)elapsed_ms);
+		return;
+	}
+	float elapsed_s = elapsed_ms / 1000.0f;
+	float avg_ms = (float)(benchmark_frame_ms_sum / (double)benchmark_frame_count);
+	printf("benchmark: %llu frames in %.2fs (%.1f fps avg) | render time min/avg/max = %.2f/%.2f/%.2f ms\n",
+		(unsigned long long)benchmark_frame_count,
+		elapsed_s,
+		benchmark_frame_count / elapsed_s,
+		benchmark_min_frame_ms, avg_ms, benchmark_max_frame_ms);
+}
 
 SDL_AppResult initialize() {
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -61,7 +134,7 @@ SDL_AppResult shutdown() {
 	SDL_DestroyTexture(texture);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
-	
+
 	free(framebuffer);
 	free(z_buffer);
 	free_world_objects(world_objects);
@@ -81,10 +154,30 @@ SDL_AppResult load_world() {
 SDL_AppResult handle_input(float delta_time) {
 	SDL_AppResult app_result;
 
+	if (benchmark_mode) {
+		// Still drain events so the OS doesn't flag the window as hung, and
+		// allow a manual abort (close button / ESC) without touching the
+		// scripted camera state.
+		SDL_Event event;
+		while (SDL_PollEvent(&event)) {
+			if (event.type == SDL_EVENT_QUIT) {
+				return SDL_APP_SUCCESS;
+			}
+			if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) {
+				return SDL_APP_SUCCESS;
+			}
+		}
+
+		Uint64 elapsed = SDL_GetTicks() - benchmark_start_time;
+		benchmark_update_camera(camera, elapsed, delta_time);
+
+		return SDL_APP_CONTINUE;
+	}
+
 	app_result = user_events(camera, &show_fps, WINDOW_WIDTH, WINDOW_HEIGHT);
 	if (app_result != SDL_APP_CONTINUE)
 		return app_result;
-	
+
 	move_camera_location(*direction_user_should_move(), camera, delta_time);
 
 	return SDL_APP_CONTINUE;
@@ -122,8 +215,10 @@ SDL_AppResult render(int fps) {
 	return SDL_APP_CONTINUE;
 }
 
-void main() {
-	SDL_Log("starting engine");
+int main(int argc, char* argv[]) {
+	parse_args(argc, argv);
+
+	SDL_Log("starting engine%s", benchmark_mode ? " (benchmark mode)" : "");
 
 	int engine_status = SDL_APP_CONTINUE;
 
@@ -133,6 +228,18 @@ void main() {
 	if (engine_status == SDL_APP_CONTINUE)
 		engine_status = load_world();
 	SDL_Log("loaded world");
+
+	if (benchmark_mode) {
+		show_fps = false; // keep debug-text overhead out of the profile
+		benchmark_start_time = SDL_GetTicks();
+		SDL_Log("benchmark: running for %u ms (still 0-%dms, rotate %d-%ums)",
+			benchmark_duration_ms, BENCHMARK_STILL_PHASE_MS, BENCHMARK_STILL_PHASE_MS, benchmark_duration_ms);
+
+		// move_camera_location()/move_camera_direction() call SDL_Log every
+		// single frame. Left on, that's stdout I/O happening hundreds of
+		// times inside the exact window VTune is sampling - mute it here.
+		SDL_SetLogPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_WARN);
+	}
 
 	Uint64 last_time_fps, last_time_delta;
 	last_time_fps = last_time_delta = SDL_GetTicks();
@@ -151,16 +258,38 @@ void main() {
 			delta_time = (float)(current_time - last_time_delta) / 1000.0f;
 			last_time_delta = current_time;
 
+			if (benchmark_mode) {
+				Uint64 elapsed = current_time - benchmark_start_time;
+				if (elapsed >= benchmark_duration_ms) {
+					print_benchmark_summary(elapsed);
+					break;
+				}
+			}
+
 			engine_status = handle_input(delta_time);
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
 
+			Uint64 render_start = SDL_GetTicks();
 			engine_status = render(fps);
 			if (engine_status != SDL_APP_CONTINUE)
 				break;
+
+			if (benchmark_mode) {
+				float render_ms = (float)(SDL_GetTicks() - render_start);
+				benchmark_frame_count++;
+				benchmark_frame_ms_sum += (double)render_ms;
+				if (render_ms < benchmark_min_frame_ms) benchmark_min_frame_ms = render_ms;
+				if (render_ms > benchmark_max_frame_ms) benchmark_max_frame_ms = render_ms;
+			}
 		}
 	}
-	
+
+	if (benchmark_mode) {
+		SDL_SetLogPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
+	}
+
 	shutdown();
 	SDL_Log("succesfully shutdown engine");
+	return 0;
 }

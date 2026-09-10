@@ -366,3 +366,19 @@ FodyWeavers.xsd
 !Assets/
 !Assets/**/
 !Assets/**
+
+# Intel VTune Profiler outputs and caches
+*.vtune
+*.pvt
+*.amplxe
+*.advixe
+
+# VTune project and result directories
+Intel® VTune™ Profiler Results/
+*_r[0-9][0-9][0-9]/
+*_r[0-9][0-9][0-9][a-z][a-z]/
+config/
+Data*.0/
+
+# VTune cache and internal logs
+.intel/
