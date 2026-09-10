@@ -25,7 +25,7 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		return NULL;
 	}
 	camera->x_direction_vector = x_direction;
-	(*camera->x_direction_vector)[0] = 1.0;
+	(*camera->x_direction_vector)[0] = -1.0;
 
 	vec3* y_direction = (vec3*)calloc(1, sizeof(vec3));
 	if (y_direction == NULL) {
@@ -46,7 +46,7 @@ Camera* load_camera(Uint32 window_width, Uint32 window_height) {
 		return NULL;
 	}
 	camera->z_direction_vector = z_direction;
-	(*camera->z_direction_vector)[2] = 1.0;
+	(*camera->z_direction_vector)[2] = -1.0;
 
 	FOV* field_of_view = malloc(sizeof(FOV));
 	if (field_of_view == NULL) {
