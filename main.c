@@ -5,8 +5,8 @@
 #include "user_input.h"
 
 
-#define WINDOW_WIDTH 1920
-#define WINDOW_HEIGHT 1080
+#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 600
 
 static SDL_Window* window = NULL;
 static SDL_Texture* texture = NULL;
