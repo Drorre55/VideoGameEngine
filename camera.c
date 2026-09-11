@@ -78,11 +78,11 @@ void free_camera(Camera* camera)
 
 void move_camera_direction(float relative_x, float relative_y, Camera* camera, Uint32 window_width, Uint32 window_height) {
 	// In the future if I will add Screw rotation than add rotate z_axis
-	float rotation_degree_x = relative_x / window_width * (camera->field_of_view->x_degree_from_center * 2);
+	float rotation_degree_x = relative_x / (float)window_width * (camera->field_of_view->x_degree_from_center * 2);
 	rotate_y_axis(*camera->x_direction_vector, rotation_degree_x);
 	rotate_y_axis(*camera->z_direction_vector, rotation_degree_x);
 
-	float rotation_degree_y = relative_y / window_height * (camera->field_of_view->y_degree_from_center * 2);
+	float rotation_degree_y = -relative_y / (float)window_height * (camera->field_of_view->y_degree_from_center * 2);
 	rotate_x_axis(*camera->y_direction_vector, rotation_degree_y);
 	rotate_x_axis(*camera->z_direction_vector, rotation_degree_y);
 	SDL_Log("new camera z direction: (%f, %f, %f)", (*camera->z_direction_vector)[0], (*camera->z_direction_vector)[1], (*camera->z_direction_vector)[2]);
