@@ -13,7 +13,7 @@ typedef union {
 typedef struct {
     Uint32 width;
     Uint32 height;
-    Uint8* pixels;
+    Color* pixels;
 } Mipmap;
 
 typedef struct {

@@ -18,7 +18,7 @@ Texture texture_load_from_file(const char* filepath)
     int placeholder = 0;
 
     // Force RGBA so renderer uses a consistent format.
-    Uint8* pixels = stbi_load(filepath, &width, &height, &placeholder, 4);
+    Color* pixels = stbi_load(filepath, &width, &height, &placeholder, 4);
 
     if (!pixels) {
         SDL_LogError(1, "Failed to load texture: %s", filepath);
@@ -42,14 +42,15 @@ static void _generate_mipmaps(Texture texture) {
     Mipmap original_image = texture.mipmaps[0];
     for (Uint8 i = 1; i < texture.num_levels; i++) {
         Uint16 new_width = 1 << (texture.num_levels - 1 - i); // 2^(texture.num_levels - i)
-        Uint16 kernel_size = 1 << i; // 2^i
+        Uint16 kernel_width = 1 << i; // 2^i
+        float kernel_size = kernel_width * kernel_width;
 
         Mipmap* mipmap = malloc(sizeof(Mipmap));
         if (!mipmap) {
             SDL_LogError(1, "Failed creating mipmap");
             return;
         }
-        Uint8* pixels = malloc(new_width * new_width * 4 * sizeof(Uint8));
+        Color* pixels = malloc(new_width * new_width * sizeof(Color));
         if (!pixels) {
             SDL_LogError(1, "Failed creating mipmap");
             return;
@@ -59,22 +60,22 @@ static void _generate_mipmaps(Texture texture) {
             for (Uint16 col = 0; col < new_width; col++) {
                 float sum_r, sum_g, sum_b, sum_a;
                 sum_r = sum_g = sum_b = sum_a = 0;
-                for (Uint16 kernel_row = 0; kernel_row < kernel_size; kernel_row++) {
-                    for (Uint16 kernel_col = 0; kernel_col < kernel_size; kernel_col++) {
-                        Uint32 original_image_idx = (
-                            (row * kernel_size + kernel_row) * original_image.width 
-                            + col * kernel_size + kernel_col) * 4;
-                        sum_r += (float)original_image.pixels[original_image_idx + 0];
-                        sum_g += (float)original_image.pixels[original_image_idx + 1];
-                        sum_b += (float)original_image.pixels[original_image_idx + 2];
-                        sum_a += (float)original_image.pixels[original_image_idx + 3];
+                for (Uint16 kernel_row = 0; kernel_row < kernel_width; kernel_row++) {
+                    for (Uint16 kernel_col = 0; kernel_col < kernel_width; kernel_col++) {
+                        Uint32 original_image_idx = (row * kernel_width + kernel_row) * original_image.width 
+                            + col * kernel_width + kernel_col;
+                        Color original_pixel = original_image.pixels[original_image_idx];
+                        sum_r += (float)original_pixel.r;
+                        sum_g += (float)original_pixel.g;
+                        sum_b += (float)original_pixel.b;
+                        sum_a += (float)original_pixel.a;
                     }
                 }
-                Uint32 new_idx = (row * new_width + col) * 4;
-                pixels[new_idx + 0] = (Uint8) (sum_r / (kernel_size * kernel_size));
-                pixels[new_idx + 1] = (Uint8) (sum_g / (kernel_size * kernel_size));
-                pixels[new_idx + 2] = (Uint8) (sum_b / (kernel_size * kernel_size));
-                pixels[new_idx + 3] = (Uint8) (sum_a / (kernel_size * kernel_size));
+                Uint32 new_idx = row * new_width + col;
+                pixels[new_idx].r = (Uint8)(sum_r / kernel_size);
+                pixels[new_idx].g = (Uint8)(sum_g / kernel_size);
+                pixels[new_idx].b = (Uint8)(sum_b / kernel_size);
+                pixels[new_idx].a = (Uint8)(sum_a / kernel_size);
             }
         }
         mipmap->pixels = pixels;
@@ -161,10 +162,10 @@ static Mipmap _mipmap_clone(const Mipmap src)
     copy.height = src.height;
 
     if (src.pixels && src.width > 0 && src.height > 0) {
-        size_t pixel_count = (size_t)src.width * (size_t)src.height * 4;
-        copy.pixels = malloc(pixel_count * sizeof(Uint8));
+        size_t pixel_count = (size_t)src.width * (size_t)src.height;
+        copy.pixels = malloc(pixel_count * sizeof(Color));
         if (copy.pixels) {
-            memcpy(copy.pixels, src.pixels, pixel_count * sizeof(Uint8));
+            memcpy(copy.pixels, src.pixels, pixel_count * sizeof(Color));
         }
     }
     return copy;
@@ -240,11 +241,11 @@ Color texture_sample_nearest(const Mipmap mipmap, float u, float v)
     Uint32 x = (Uint32)(uu * (float)texture->width) % texture->width;
     Uint32 y = (Uint32)(vv * (float)texture->height) % texture->height;
 
-    Uint32 index = (y * texture->width + x) * 4;
-    pixel.r = texture->pixels[index + 0];
-    pixel.g = texture->pixels[index + 1];
-    pixel.b = texture->pixels[index + 2];
-    pixel.a = texture->pixels[index + 3];*/
+    Uint32 index = y * texture->width + x;
+    pixel.r = texture->pixels[index].r;
+    pixel.g = texture->pixels[index].g;
+    pixel.b = texture->pixels[index].b;
+    pixel.a = texture->pixels[index].a;*/
 
     return pixel;
 }
@@ -270,30 +271,30 @@ Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
     float tx = x - (float)x0;
     float ty = y - (float)y0;
     
-    Uint32 idx00 = (y0 * mipmap.width + x0) * 4;
-    Uint32 idx10 = (y0 * mipmap.width + x1) * 4;
-    Uint32 idx01 = (y1 * mipmap.width + x0) * 4;
-    Uint32 idx11 = (y1 * mipmap.width + x1) * 4;
+    Uint32 idx00 = y0 * mipmap.width + x0;
+    Uint32 idx10 = y0 * mipmap.width + x1;
+    Uint32 idx01 = y1 * mipmap.width + x0;
+    Uint32 idx11 = y1 * mipmap.width + x1;
 
-    float r00 = (float)mipmap.pixels[idx00 + 0];
-    float g00 = (float)mipmap.pixels[idx00 + 1];
-    float b00 = (float)mipmap.pixels[idx00 + 2];
-    float a00 = (float)mipmap.pixels[idx00 + 3];
+    float r00 = (float)mipmap.pixels[idx00].r;
+    float g00 = (float)mipmap.pixels[idx00].g;
+    float b00 = (float)mipmap.pixels[idx00].b;
+    float a00 = (float)mipmap.pixels[idx00].a;
 
-    float r10 = (float)mipmap.pixels[idx10 + 0];
-    float g10 = (float)mipmap.pixels[idx10 + 1];
-    float b10 = (float)mipmap.pixels[idx10 + 2];
-    float a10 = (float)mipmap.pixels[idx10 + 3];
+    float r10 = (float)mipmap.pixels[idx10].r;
+    float g10 = (float)mipmap.pixels[idx10].g;
+    float b10 = (float)mipmap.pixels[idx10].b;
+    float a10 = (float)mipmap.pixels[idx10].a;
 
-    float r01 = (float)mipmap.pixels[idx01 + 0];
-    float g01 = (float)mipmap.pixels[idx01 + 1];
-    float b01 = (float)mipmap.pixels[idx01 + 2];
-    float a01 = (float)mipmap.pixels[idx01 + 3];
+    float r01 = (float)mipmap.pixels[idx01].r;
+    float g01 = (float)mipmap.pixels[idx01].g;
+    float b01 = (float)mipmap.pixels[idx01].b;
+    float a01 = (float)mipmap.pixels[idx01].a;
 
-    float r11 = (float)mipmap.pixels[idx11 + 0];
-    float g11 = (float)mipmap.pixels[idx11 + 1];
-    float b11 = (float)mipmap.pixels[idx11 + 2];
-    float a11 = (float)mipmap.pixels[idx11 + 3];
+    float r11 = (float)mipmap.pixels[idx11].r;
+    float g11 = (float)mipmap.pixels[idx11].g;
+    float b11 = (float)mipmap.pixels[idx11].b;
+    float a11 = (float)mipmap.pixels[idx11].a;
 
     float r0 = r00 + (r10 - r00) * tx;
     float g0 = g00 + (g10 - g00) * tx;
