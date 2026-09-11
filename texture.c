@@ -2,6 +2,7 @@
 #include "texture.h"
 #include "stb_image.h"
 #include <string.h>
+#include <immintrin.h>
 
 // Pre-computed Morton indices for an 8x8 block.
 // Format: [row][col], matching your corrected structural access order.
@@ -380,22 +381,42 @@ Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
     Color pixel10 = _sample_tiled_pixel(&mipmap, row1, col0);
     Color pixel11 = _sample_tiled_pixel(&mipmap, row1, col1);
 
-    float r0 = glm_lerp(pixel00.r, pixel01.r, t_col);
-    float g0 = glm_lerp(pixel00.g, pixel01.g, t_col);
-    float b0 = glm_lerp(pixel00.b, pixel01.b, t_col);
-    float a0 = glm_lerp(pixel00.a, pixel01.a, t_col);
+    // 3. Convert 8-bit RGBA channels to 32-bit floats inside SIMD registers
+    // We unpack the bytes into floats so we can do precise blending math
+    __m128 v_p00 = _mm_set_ps((float)pixel00.a, (float)pixel00.b, (float)pixel00.g, (float)pixel00.r);
+    __m128 v_p01 = _mm_set_ps((float)pixel01.a, (float)pixel01.b, (float)pixel01.g, (float)pixel01.r);
+    __m128 v_p10 = _mm_set_ps((float)pixel10.a, (float)pixel10.b, (float)pixel10.g, (float)pixel10.r);
+    __m128 v_p11 = _mm_set_ps((float)pixel11.a, (float)pixel11.b, (float)pixel11.g, (float)pixel11.r);
 
-    float r1 = glm_lerp(pixel10.r, pixel11.r, t_col);
-    float g1 = glm_lerp(pixel10.g, pixel11.g, t_col);
-    float b1 = glm_lerp(pixel10.b, pixel11.b, t_col);
-    float a1 = glm_lerp(pixel10.a, pixel11.a, t_col);
+    // 4. Setup interpolation weights as vector constants
+    __m128 v_t_col = _mm_set1_ps(t_col);
+    __m128 v_t_row = _mm_set1_ps(t_row);
 
-    pixel.r = (Uint8)glm_lerp(r0, r1, t_row);
-    pixel.g = (Uint8)glm_lerp(g0, g1, t_row);
-    pixel.b = (Uint8)glm_lerp(b0, b1, t_row);
-    pixel.a = (Uint8)glm_lerp(a0, a1, t_row);
+    // 5. Perform Vectorized LERP across columns for all 4 channels at once
+    // Formula: mixed = start + t * (end - start)
+    __m128 v_m0 = _mm_add_ps(v_p00, _mm_mul_ps(v_t_col, _mm_sub_ps(v_p01, v_p00))); // Top row LERP
+    __m128 v_m1 = _mm_add_ps(v_p10, _mm_mul_ps(v_t_col, _mm_sub_ps(v_p11, v_p10))); // Bottom row LERP
 
-    return pixel;
+    // 6. Perform Vectorized LERP vertically between rows
+    __m128 v_final = _mm_add_ps(v_m0, _mm_mul_ps(v_t_row, _mm_sub_ps(v_m1, v_m0)));
+
+    /// --- THE REGISTER OPTIMIZATION FIX ---
+    // 1. Direct float-to-int32 conversions entirely within vector pipelines
+    __m128i v_int = _mm_cvtps_epi32(v_final);
+
+    // 2. Compress four 32-bit integers down to 8-bit bytes inside a single register
+    v_int = _mm_packus_epi32(v_int, v_int); // Down to 16-bit elements
+    v_int = _mm_packus_epi16(v_int, v_int); // Down to contiguous 8-bit RGBA channels
+
+    // --- MSVC ALIASING FIX ---
+    // A union guarantees MSVC returns the raw 32-bit register directly
+    union {
+        Uint32 raw;
+        Color color;
+    } result;
+
+    result.raw = (Uint32)_mm_cvtsi128_si32(v_int);
+    return result.color;
 }
 
 inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
