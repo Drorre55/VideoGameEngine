@@ -33,8 +33,6 @@ typedef struct {
     Uint32 capacity;
 } TextureBank;
 
-static uint32_t _encode_morton_2d(uint32_t x, uint32_t y);
-
 TiledTexture texture_load_from_file(const char* filepath);
 static void _generate_sub_mipmaps(TiledTexture texture);
 void texture_free(TiledTexture* mipmaps);
@@ -42,7 +40,6 @@ void texture_free(TiledTexture* mipmaps);
 TextureBank texture_bank_create(Uint32 capacity);
 void texture_bank_free(TextureBank* bank);
 TiledTexture texture_clone(const TiledTexture src);
-static Mipmap _mipmap_clone(const Mipmap src);
 TextureBank texture_bank_deep_copy(const TextureBank* src);
 Uint32 texture_bank_add(TextureBank* bank, TiledTexture mipmaps);
 Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath);

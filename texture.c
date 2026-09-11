@@ -3,98 +3,18 @@
 #include "stb_image.h"
 #include <string.h>
 
-#if defined(_MSC_VER)
-#include <intrin.h>
-#elif defined(__GNUC__) || defined(__clang__)
-#include <cpuid.h>
-#include <immintrin.h>
-#endif
-
-// Force BMI2 target for GCC/Clang just for this block
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((target("bmi2")))
-#endif
-static uint32_t _encode_morton_2d_pdep(uint32_t x, uint32_t y) {
-    return _pdep_u32(x, 0x55555555u) | _pdep_u32(y, 0xAAAAAAAAu);
-}
-
-static inline uint32_t _encode_morton_2d_scalar(uint32_t x, uint32_t y) {
-    uint32_t index = 0u;
-    // Keeping this inline allows the compiler to unroll this seamlessly
-    for (int i = 0; i < TILE_WIDTH_BITS; i++) {
-        index |= (((x >> i) & 1u) << (i * 2));
-        index |= (((y >> i) & 1u) << (i * 2 + 1));
-    }
-    return index;
-}
-
-// Safer Runtime Check: Rejects AMD unless it's Zen 4 (Family 19h / Model 90h+ or Family 1Ah+)
-static int _cpu_has_fast_bmi2(void) {
-    unsigned int regs[4] = { 0 };
-
-#if defined(_MSC_VER)
-    __cpuid((int*)regs, 0);
-#elif defined(__GNUC__) || defined(__clang__)
-    if (!__get_cpuid(0, &regs[0], &regs[1], &regs[2], &regs[3])) return 0;
-#else
-    return 0;
-#endif
-
-    // Check if vendor is "AuthenticAMD"
-    int is_amd = (regs[1] == 0x68747541 && regs[3] == 0x69746e65 && regs[2] == 0x444d4163);
-
-    // Get feature flags (Leaf 7)
-#if defined(_MSC_VER)
-    __cpuidex((int*)regs, 7, 0);
-#else
-    __get_cpuid_count(7, 0, &regs[0], &regs[1], &regs[2], &regs[3]);
-#endif
-
-    int has_bmi2 = (regs[1] & (1 << 8)) != 0;
-    if (!has_bmi2) return 0;
-
-    // If it's AMD, we must check the Family to avoid slow microcoded PDEP
-    if (is_amd) {
-#if defined(_MSC_VER)
-        __cpuid((int*)regs, 1);
-#else
-        __get_cpuid(1, &regs[0], &regs[1], &regs[2], &regs[3]);
-#endif
-        unsigned int family = ((regs[0] >> 8) & 0xF);
-        unsigned int extended_family = ((regs[0] >> 20) & 0xFF);
-        unsigned int total_family = family + extended_family;
-
-        // AMD Family 25 (0x19) is Zen 3/4. Zen 4 models are >= 0x60. 
-        // Family 26 (0x1A) is Zen 5.
-        if (total_family < 25) return 0; // Reject Zen 1, Zen+, Zen 2
-        if (total_family == 25) {
-            unsigned int model = ((regs[0] >> 4) & 0xF);
-            unsigned int extended_model = ((regs[0] >> 12) & 0xF);
-            unsigned int total_model = (extended_model << 4) | model;
-            if (total_model < 0x60) return 0; // Reject Zen 3, accept Zen 4
-        }
-    }
-
-    return 1; // Intel or Zen 4+ AMD with fast hardware PDEP
-}
-
-// Public API: Fast Branch Dispatching instead of slow pointer tracking
-static inline uint32_t _encode_morton_2d(uint32_t x, uint32_t y) {
-    static int is_init = 0;
-    static int use_pdep = 0;
-
-    if (is_init == 0) {
-        use_pdep = _cpu_has_fast_bmi2();
-        is_init = 1;
-    }
-
-    if (use_pdep) {
-        return _encode_morton_2d_pdep(x, y);
-    }
-    else {
-        return _encode_morton_2d_scalar(x, y);
-    }
-}
+// Pre-computed Morton indices for an 8x8 block.
+// Format: [row][col], matching your corrected structural access order.
+static const uint8_t MORTON_LUT[8][8] = {
+    { 0,  1,  4,  5, 16, 17, 20, 21 },
+    { 2,  3,  6,  7, 18, 19, 22, 23 },
+    { 8,  9, 12, 13, 24, 25, 28, 29 },
+    {10, 11, 14, 15, 26, 27, 30, 31 },
+    {32, 33, 36, 37, 48, 49, 52, 53 },
+    {34, 35, 38, 39, 50, 51, 54, 55 },
+    {40, 41, 44, 45, 56, 57, 60, 61 },
+    {42, 43, 46, 47, 58, 59, 62, 63 }
+};
 
 // Looks up a pixel color inside a specific mipmap level.
 // This function bypasses linear memory rules entirely.
@@ -111,7 +31,7 @@ static inline Color _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32
     Uint32 tile_offset = tile_index * TILE_PIXELS;
 
     // 3. Find the Morton localized index inside the target 8x8 tile
-    Uint32 local_morton_index = _encode_morton_2d(pixel_col, pixel_row);
+    Uint32 local_morton_index = MORTON_LUT[pixel_row][pixel_col];
     
     // 4. Single memory lookup 
     return mipmap->pixels[tile_offset + local_morton_index];
@@ -182,7 +102,7 @@ static void _populate_mipmap(Mipmap mipmap, const Color* linear_input, Uint32 wi
 
             Uint32 tile_index = (tile_row * mipmap.width_in_tiles) + tile_col;
             Uint32 tile_offset = tile_index * TILE_PIXELS;
-            Uint32 local_morton = _encode_morton_2d(pixel_col, pixel_row);
+            Uint32 local_morton = MORTON_LUT[pixel_row][pixel_col];
 
             // Write to the contiguous tiled pool
             mipmap.pixels[tile_offset + local_morton] = pixel_color;
@@ -261,7 +181,7 @@ static void _generate_sub_mipmaps(TiledTexture texture) {
 
                 uint32_t mipmap_tile_idx = (mipmap_tile_row * mipmap.width_in_tiles) + mipmap_tile_col;
                 uint32_t mipmap_tile_offset = mipmap_tile_idx * TILE_PIXELS;
-                uint32_t mipmap_morton = _encode_morton_2d(mipmap_pixel_col, mipmap_pixel_row);
+                uint32_t mipmap_morton = MORTON_LUT[mipmap_pixel_row][mipmap_pixel_col];
 
                 mipmap.pixels[mipmap_tile_offset + mipmap_morton] = average_color;
             }
