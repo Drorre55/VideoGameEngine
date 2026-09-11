@@ -60,7 +60,7 @@ static inline uint32_t _encode_morton_2d(uint32_t x, uint32_t y) {
 
 static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y) {
 #if defined(__BMI2__)
-    if (cpu_has_bmi2()) {
+    if (_cpu_has_bmi2()) {
         encode_morton_2d_ptr = _encode_morton_2d_pdep;
     }
     else {
@@ -76,19 +76,19 @@ static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y) {
 // This function bypasses linear memory rules entirely.
 static inline Color _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32 col) {
     // 1. Isolate the tile coordinate vs the pixel position inside that tile
-    uint32_t tile_row = row >> TILE_WIDTH_BITS; // row / TILE_WIDTH
-    uint32_t tile_col = col >> TILE_WIDTH_BITS; // col / TILE_WIDTH
+    Uint32 tile_row = row >> TILE_WIDTH_BITS; // row / TILE_WIDTH
+    Uint32 tile_col = col >> TILE_WIDTH_BITS; // col / TILE_WIDTH
 
-    uint32_t pixel_row = row & (TILE_WIDTH - 1); // row % TILE_WIDTH
-    uint32_t pixel_col = col & (TILE_WIDTH - 1); // col % TILE_WIDTH
+    Uint32 pixel_row = row & (TILE_WIDTH - 1u); // row % TILE_WIDTH
+    Uint32 pixel_col = col & (TILE_WIDTH - 1u); // col % TILE_WIDTH
 
     // 2. Find the flat index of the tile itself (Row-major for tiles)
-    uint32_t tile_index = (tile_row * mipmap->width_in_tiles) + tile_col;
-    uint32_t tile_offset = tile_index * TILE_PIXELS;
+    Uint32 tile_index = (tile_row * mipmap->width_in_tiles) + tile_col;
+    Uint32 tile_offset = tile_index * TILE_PIXELS;
 
     // 3. Find the Morton localized index inside the target 8x8 tile
-    uint32_t local_morton_index = _encode_morton_2d(pixel_col, pixel_row);
-
+    Uint32 local_morton_index = _encode_morton_2d(pixel_col, pixel_row);
+    
     // 4. Single memory lookup 
     return mipmap->pixels[tile_offset + local_morton_index];
 }
@@ -195,10 +195,10 @@ TiledTexture texture_load_from_file(const char* filepath)
 static void _generate_sub_mipmaps(TiledTexture texture) {
     Mipmap original_image = texture.mipmaps[0];
     for (Uint8 i = 1; i < texture.num_levels; i++) {
-        Uint16 new_width = 1 << (texture.num_levels - 1 - i); // 2^(texture.num_levels - i)
-        Uint16 kernel_width = 1 << i; // 2^i
-        float kernel_size = kernel_width * kernel_width;
         Mipmap mipmap = texture.mipmaps[i];
+        Uint16 new_width = mipmap.width;
+        Uint16 kernel_width = 1u << i; // 2^i
+        float kernel_size = (float)(kernel_width * kernel_width);
 
         for (Uint16 row = 0; row < new_width; row++) {
             for (Uint16 col = 0; col < new_width; col++) {
@@ -250,22 +250,11 @@ void texture_free(TiledTexture* texture)
     if (!texture || texture->num_levels == 0)
         return;
 
-    for (Uint8 i = 0; i < texture->num_levels; i++) {
-        _mipmap_free(&texture->mipmaps[i]);
-    }
+    free(texture->mipmaps);
+    free(texture->contiguous_buffer);
     texture->mipmaps = NULL;
+    texture->contiguous_buffer = NULL;
     texture->num_levels = 0;
-}
-
-static void _mipmap_free(Mipmap* mipmap)
-{
-    if (!mipmap || !mipmap->pixels)
-        return;
-
-    stbi_image_free(mipmap->pixels);
-    mipmap->pixels = NULL;
-    mipmap->width = 0;
-    mipmap->height = 0;
 }
 
 TextureBank texture_bank_create(Uint32 capacity)
@@ -435,21 +424,21 @@ Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
     Color pixel01 = _sample_tiled_pixel(&mipmap, row0, col1);
     Color pixel10 = _sample_tiled_pixel(&mipmap, row1, col0);
     Color pixel11 = _sample_tiled_pixel(&mipmap, row1, col1);
- 
-    float r0 = pixel00.r + (pixel01.r - pixel00.r) * t_col;
-    float g0 = pixel00.g + (pixel01.g - pixel00.g) * t_col;
-    float b0 = pixel00.b + (pixel01.b - pixel00.b) * t_col;
-    float a0 = pixel00.a + (pixel01.a - pixel00.a) * t_col;
 
-    float r1 = pixel10.r + (pixel11.r - pixel10.r) * t_col;
-    float g1 = pixel10.g + (pixel11.g - pixel10.g) * t_col;
-    float b1 = pixel10.b + (pixel11.b - pixel10.b) * t_col;
-    float a1 = pixel10.a + (pixel11.a - pixel10.a) * t_col;
+    float r0 = glm_lerp(pixel00.r, pixel01.r, t_col);
+    float g0 = glm_lerp(pixel00.g, pixel01.g, t_col);
+    float b0 = glm_lerp(pixel00.b, pixel01.b, t_col);
+    float a0 = glm_lerp(pixel00.a, pixel01.a, t_col);
 
-    pixel.r = (Uint8)(r0 + (r1 - r0) * t_row);
-    pixel.g = (Uint8)(g0 + (g1 - g0) * t_row);
-    pixel.b = (Uint8)(b0 + (b1 - b0) * t_row);
-    pixel.a = (Uint8)(a0 + (a1 - a0) * t_row);
+    float r1 = glm_lerp(pixel10.r, pixel11.r, t_col);
+    float g1 = glm_lerp(pixel10.g, pixel11.g, t_col);
+    float b1 = glm_lerp(pixel10.b, pixel11.b, t_col);
+    float a1 = glm_lerp(pixel10.a, pixel11.a, t_col);
+
+    pixel.r = (Uint8)glm_lerp(r0, r1, t_row);
+    pixel.g = (Uint8)glm_lerp(g0, g1, t_row);
+    pixel.b = (Uint8)glm_lerp(b0, b1, t_row);
+    pixel.a = (Uint8)glm_lerp(a0, a1, t_row);
 
     return pixel;
 }

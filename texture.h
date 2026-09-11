@@ -38,7 +38,6 @@ static uint32_t _encode_morton_2d(uint32_t x, uint32_t y);
 TiledTexture texture_load_from_file(const char* filepath);
 static void _generate_sub_mipmaps(TiledTexture texture);
 void texture_free(TiledTexture* mipmaps);
-static void _mipmap_free(Mipmap* mipmap);
 
 TextureBank texture_bank_create(Uint32 capacity);
 void texture_bank_free(TextureBank* bank);
