@@ -1,6 +1,7 @@
 #include "rasterizer.h"
 #include "transformation_utils.h"
 #include "cglm/cglm.h"
+#include <immintrin.h>
 #define CORNERS 3
 
 
@@ -209,65 +210,132 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
             float base_wA = (first_x_minus_C * dA_dx) + (first_y_minus_C * dA_dy);
             float base_wB = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
 
+            // Pre-load your constant step derivatives into SIMD registers
+            __m128 v_dA_dy = _mm_set1_ps(dA_dy);
+            __m128 v_dB_dy = _mm_set1_ps(dB_dy);
+
+            __m128 v_inv_Az_minus_C = _mm_set1_ps(inv_Az_minus_C);
+            __m128 v_inv_Bz_minus_C = _mm_set1_ps(inv_Bz_minus_C);
+            __m128 v_inv_Cz = _mm_set1_ps(inv_Cz);
+
+            // Vectorize texture coordinate step constants (assuming uvs are 2D floats)
+            __m128 v_Auv_minus_C_u = _mm_set1_ps(Auv_minus_C[0]);
+            __m128 v_Auv_minus_C_v = _mm_set1_ps(Auv_minus_C[1]);
+            __m128 v_Buv_minus_C_u = _mm_set1_ps(Buv_minus_C[0]);
+            __m128 v_Buv_minus_C_v = _mm_set1_ps(Buv_minus_C[1]);
+            __m128 v_C_uv_u = _mm_set1_ps((*C_uv)[0]);
+            __m128 v_C_uv_v = _mm_set1_ps((*C_uv)[1]);
+            // my test
+            __m128 v_du_dx = _mm_set1_ps(duv_dx[0]);
+            __m128 v_dv_dx = _mm_set1_ps(duv_dx[1]);
+            __m128 v_du_dy = _mm_set1_ps(duv_dy[0]);
+            __m128 v_dv_dy = _mm_set1_ps(duv_dy[1]);
+
             // Row loop
             // Step rows down by 2
             // Step rows vertically by 2 to maximize L1 texture cache locality
             for (int current_y = y_min; current_y <= y_max; current_y += 2) {
+                // 1. SETUP LOGICAL OFFSETS FOR PIXEL 0 (qy=0) AND PIXEL 1 (qy=1)
+                // Lane 0: offset 0.0f, Lane 1: offset 1.0f, Lanes 2 & 3: dummy values
+                __m128 v_qy = _mm_set_ps(0.0f, 0.0f, 1.0f, 0.0f);
 
+                // 2. COMPUTE BARYCENTRIC WEIGHTS FOR BOTH PIXELS SIMULTANEOUSLY
+                __m128 v_base_wA = _mm_set1_ps(base_wA);
+                __m128 v_base_wB = _mm_set1_ps(base_wB);
+
+                __m128 v_wA = _mm_add_ps(v_base_wA, _mm_mul_ps(v_qy, v_dA_dy));
+                __m128 v_wB = _mm_add_ps(v_base_wB, _mm_mul_ps(v_qy, v_dB_dy));
+                __m128 v_wC = _mm_sub_ps(_mm_sub_ps(_mm_set1_ps(1.0f), v_wA), v_wB);
+
+                // 3. GENERATE THE COVERAGE MASK
+                // Check if wA >= 0, wB >= 0, wC >= 0 for both lanes
+                __m128 v_zero = _mm_setzero_ps();
+                __m128 mask_wA = _mm_cmpge_ps(v_wA, v_zero);
+                __m128 mask_wB = _mm_cmpge_ps(v_wB, v_zero);
+                __m128 mask_wC = _mm_cmpge_ps(v_wC, v_zero);
+                __m128 mask_coverage = _mm_and_ps(_mm_and_ps(mask_wA, mask_wB), mask_wC);
+
+                // If both pixels fall completely outside the triangle, skip the entire math block
+                if (_mm_movemask_ps(mask_coverage) == 0) {
+                    base_wA += (dA_dy * 2.0f);
+                    base_wB += (dB_dy * 2.0f);
+                    continue;
+                }
+
+                // 4. INTERPOLATE DEPTH (1/Z) & COMPUTE PERSPECTIVE CORRECTIVE Z
+                __m128 v_depth = _mm_add_ps(v_inv_Cz,
+                    _mm_add_ps(_mm_mul_ps(v_inv_Az_minus_C, v_wA), _mm_mul_ps(v_inv_Bz_minus_C, v_wB))
+                );
+
+                // Vectorized division: z = 1.0f / depth
+                __m128 v_z = _mm_div_ps(_mm_set1_ps(1.0f), v_depth);
+
+                // 5. INTERPOLATE PERSPECTIVE-CORRECTED U & V COORDINATES
+                __m128 v_u = _mm_mul_ps(_mm_add_ps(v_C_uv_u, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_u, v_wA), _mm_mul_ps(v_Buv_minus_C_u, v_wB))), v_z);
+                __m128 v_v = _mm_mul_ps(_mm_add_ps(v_C_uv_v, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_v, v_wA), _mm_mul_ps(v_Buv_minus_C_v, v_wB))), v_z);
+
+                __m128 v_local_du_dx = _mm_mul_ps(v_du_dx, v_z);
+                __m128 v_local_dv_dx = _mm_mul_ps(v_dv_dx, v_z);
+                __m128 v_local_du_dy = _mm_mul_ps(v_du_dy, v_z);
+                __m128 v_local_dv_dy = _mm_mul_ps(v_dv_dy, v_z);
+
+                // Extract computed lanes back to scalar values to perform Z-buffering and texturing
+                float u_lanes[4], v_lanes[4], depth_lanes[4], du_dx_lanes[4], dv_dx_lanes[4], du_dy_lanes[4], dv_dy_lanes[4];
+                _mm_storeu_ps(u_lanes, v_u);
+                _mm_storeu_ps(v_lanes, v_v);
+                _mm_storeu_ps(depth_lanes, v_depth);
+                _mm_storeu_ps(du_dx_lanes, v_local_du_dx);
+                _mm_storeu_ps(dv_dx_lanes, v_local_dv_dx);
+                _mm_storeu_ps(du_dy_lanes, v_local_du_dy);
+                _mm_storeu_ps(dv_dy_lanes, v_local_dv_dy);
+                int coverage_mask = _mm_movemask_ps(mask_coverage);
+
+                // 6. SCALAR BACKEND: BLIT TO FRAMEBUFFER
                 for (int qy = 0; qy < 2; qy++) {
+                    // Check if this specific lane is marked valid by the SIMD edge test
+                    if (!(coverage_mask & (1 << qy))) continue;
+
                     int py = current_y + qy;
                     if (py > y_max) continue;
+                    float interpolated_depth = depth_lanes[qy];
+                    int pixel_idx = py * frame_width + current_x;
 
-                    // Increment weights vertically
-                    float wA = base_wA + (qy * dA_dy);
-                    float wB = base_wB + (qy * dB_dy);
-                    float wC = 1.0f - wA - wB;
+                    if (interpolated_depth > z_buffer[pixel_idx]) {
+                        z_buffer[pixel_idx] = interpolated_depth;
 
-                    if (wA >= 0.0f && wB >= 0.0f && wC >= 0.0f) {
-                        float interpolated_depth = inv_Cz + inv_Az_minus_C * wA + inv_Bz_minus_C * wB;
-                        int pixel_idx = py * frame_width + current_x;
+                        Uint32 final_color = 0xFFFFFFFF;
+                        if (has_texture) {
+                            vec2 scaled_duv_dx = { du_dx_lanes[qy], dv_dx_lanes[qy] };
+                            vec2 scaled_duv_dy = { du_dy_lanes[qy], dv_dy_lanes[qy] };
 
-                        if (interpolated_depth > z_buffer[pixel_idx]) {
-                            z_buffer[pixel_idx] = interpolated_depth;
-
-                            Uint32 final_color = 0xFFFFFFFF;
-                            if (has_texture) {
-                                float z = 1.0f / interpolated_depth;
-
-                                float u = ((*C_uv)[0] + Auv_minus_C[0] * wA + Buv_minus_C[0] * wB) * z;
-                                float v = ((*C_uv)[1] + Auv_minus_C[1] * wA + Buv_minus_C[1] * wB) * z;
-
-                                vec2 scaled_duv_dx, scaled_duv_dy;
-                                glm_vec2_scale(duv_dx, z, scaled_duv_dx);
-                                glm_vec2_scale(duv_dy, z, scaled_duv_dy);
-
-                                // Invoke your trilinear sampler pipeline cleanly
-                                Color texel = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
-                                final_color = _color_to_uint32(texel);
-                            }
-                            else {
-                                // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
-                                float r = C_color[0] + Acolor_minus_C[0] * wA + Bcolor_minus_C[0] * wB;
-                                float g = C_color[1] + Acolor_minus_C[1] * wA + Bcolor_minus_C[1] * wB;
-                                float b = C_color[2] + Acolor_minus_C[2] * wA + Bcolor_minus_C[2] * wB;
-
-                                // Clamp the interpolated float channels to valid 0-255 bounds before casting
-                                int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
-                                int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
-                                int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
-
-                                Color fallback_color = {
-                                    .r = ir,
-                                    .g = ig,
-                                    .b = ib,
-                                    .a = 255
-                                };
-
-                                final_color = _color_to_uint32(fallback_color);
-                            }
-
-                            frame[pixel_idx] = final_color;
+                            // Invoke your trilinear sampler pipeline cleanly
+                            Color texel = texture_sample_trilinear(texture, u_lanes[qy], v_lanes[qy], scaled_duv_dx, scaled_duv_dy);
+                            final_color = _color_to_uint32(texel);
                         }
+                        else {
+                            float wA_scalar = base_wA + (qy * dA_dy);
+                            float wB_scalar = base_wB + (qy * dB_dy);
+                            // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
+                            float r = C_color[0] + Acolor_minus_C[0] * wA_scalar + Bcolor_minus_C[0] * wB_scalar;
+                            float g = C_color[1] + Acolor_minus_C[1] * wA_scalar + Bcolor_minus_C[1] * wB_scalar;
+                            float b = C_color[2] + Acolor_minus_C[2] * wA_scalar + Bcolor_minus_C[2] * wB_scalar;
+
+                            // Clamp the interpolated float channels to valid 0-255 bounds before casting
+                            int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
+                            int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
+                            int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
+
+                            Color fallback_color = {
+                                .r = ir,
+                                .g = ig,
+                                .b = ib,
+                                .a = 255
+                            };
+
+                            final_color = _color_to_uint32(fallback_color);
+                        }
+
+                        frame[pixel_idx] = final_color;
                     }
                 }
                 // Step base weights down by 2 vertical lines
