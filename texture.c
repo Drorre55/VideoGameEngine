@@ -3,20 +3,179 @@
 #include "stb_image.h"
 
 #include <string.h>
-#include <cglm/cglm.h>
+#include <immintrin.h>
 
-Texture texture_load_from_file(const char* filepath)
+#if defined(_MSC_VER)
+#include <intrin.h>
+#elif defined(__GNUC__) || defined(__clang__)
+#include <cpuid.h>
+#endif
+
+// Runtime check for BMI2 (PDEP).
+// Returns non-zero when the CPU supports BMI2.
+static inline int _cpu_has_bmi2(void) {
+#if defined(_MSC_VER)
+    int regs[4] = { 0 };
+    __cpuidex(regs, 7, 0); // leaf 7, subleaf 0 -> EBX bit 8 = BMI2
+    return (regs[1] & (1 << 8)) != 0;
+#elif defined(__GNUC__) || defined(__clang__)
+    unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
+    if (!__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx))
+        return 0;
+    return (ebx & (1u << 8)) != 0; // EBX bit 8 = BMI2
+#else
+    return 0;
+#endif
+}
+
+#if defined(__BMI2__)
+static inline uint32_t _encode_morton_2d_pdep(uint32_t x, uint32_t y) {
+    // Masks to spread bits into every second position (e.g., 00000abc -> 0a0b0c)
+    uint32_t x_spread = _pdep_u32(x, 0x55555555u);
+    uint32_t y_spread = _pdep_u32(y, 0xAAAAAAAAu);
+    return x_spread | y_spread;
+}
+#endif
+
+static inline uint32_t _encode_morton_2d_scalar(uint32_t x, uint32_t y) {
+    // Portable scalar fallback: interleave bits manually
+    uint32_t index = 0u;
+    for (int i = 0; i < TILE_WIDTH_BITS; i++) {
+        index |= (((x >> i) & 1u) << (i * 2));
+        index |= (((y >> i) & 1u) << (i * 2 + 1));
+    }
+    return index;
+}
+
+/* Dispatch-on-first-call via a function pointer.
+   - First call goes to init, which queries CPU and switches the pointer.
+   - Subsequent calls are a single indirect call to the chosen implementation.
+*/
+static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y);
+static uint32_t(*encode_morton_2d_ptr)(uint32_t, uint32_t) = _encode_morton_2d_init;
+
+static inline uint32_t _encode_morton_2d(uint32_t x, uint32_t y) {
+    return encode_morton_2d_ptr(x, y);
+}
+
+static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y) {
+#if defined(__BMI2__)
+    if (cpu_has_bmi2()) {
+        encode_morton_2d_ptr = _encode_morton_2d_pdep;
+    }
+    else {
+        encode_morton_2d_ptr = _encode_morton_2d_scalar;
+    }
+#else
+    encode_morton_2d_ptr = _encode_morton_2d_scalar;
+#endif
+    return encode_morton_2d_ptr(x, y);
+}
+
+// Looks up a pixel color inside a specific mipmap level.
+// This function bypasses linear memory rules entirely.
+static inline Color _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32 col) {
+    // 1. Isolate the tile coordinate vs the pixel position inside that tile
+    uint32_t tile_row = row >> TILE_WIDTH_BITS; // row / TILE_WIDTH
+    uint32_t tile_col = col >> TILE_WIDTH_BITS; // col / TILE_WIDTH
+
+    uint32_t pixel_row = row & (TILE_WIDTH - 1); // row % TILE_WIDTH
+    uint32_t pixel_col = col & (TILE_WIDTH - 1); // col % TILE_WIDTH
+
+    // 2. Find the flat index of the tile itself (Row-major for tiles)
+    uint32_t tile_index = (tile_row * mipmap->width_in_tiles) + tile_col;
+    uint32_t tile_offset = tile_index * TILE_PIXELS;
+
+    // 3. Find the Morton localized index inside the target 8x8 tile
+    uint32_t local_morton_index = _encode_morton_2d(pixel_col, pixel_row);
+
+    // 4. Single memory lookup 
+    return mipmap->pixels[tile_offset + local_morton_index];
+}
+
+TiledTexture create_tiled_texture(uint32_t width, uint32_t height) {
+    TiledTexture texture = { 0 };
+
+    // Calculate total required pixels across all mips
+    Uint32 total_pixels = 0;
+    Uint32 mipmap_width = width, mipmap_height = height;
+    Uint8 num_levels = 0;
+
+    while (mipmap_width >= 1 && mipmap_height >= 1) {
+        // Pad dimensions to 8x8 tile boundaries
+        Uint32 padded_w = ((mipmap_width + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
+        Uint32 padded_h = ((mipmap_height + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
+        total_pixels += padded_w * padded_h;
+
+        num_levels++;
+        if (mipmap_width == 1 && mipmap_height == 1) break;
+        mipmap_width = mipmap_width > 1 ? mipmap_width >> 1 : 1; // mipmap_width / 2 unless already 1
+        mipmap_height = mipmap_height > 1 ? mipmap_height >> 1 : 1; // mipmap_height / 2 unless already 1
+    }
+    texture.num_levels = num_levels;
+
+    texture.mipmaps = malloc(num_levels * sizeof(Mipmap));
+
+    // 64-byte aligned allocation for optimal CPU cache line alignment
+    texture.contiguous_buffer = (Color*)_aligned_malloc(total_pixels * sizeof(Color), 64);
+
+    // Assign pointers inside the flat pool
+    Color* current_ptr = texture.contiguous_buffer;
+    mipmap_width = width; mipmap_height = height;
+    for (Uint32 i = 0; i < num_levels; i++) {
+        Uint32 padded_w = ((mipmap_width + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
+        Uint32 padded_h = ((mipmap_height + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
+
+        texture.mipmaps[i].width = mipmap_width;
+        texture.mipmaps[i].height = mipmap_height;
+        texture.mipmaps[i].width_in_tiles = padded_w >> TILE_WIDTH_BITS; // padded_w / TILE_WIDTH
+        texture.mipmaps[i].pixels = current_ptr;
+
+        current_ptr += (padded_w * padded_h);
+        mipmap_width = mipmap_width > 1 ? mipmap_width >> 1 : 1; // mipmap_width / 2 unless already 1
+        mipmap_height = mipmap_height > 1 ? mipmap_height >> 1 : 1; // mipmap_height / 2 unless already 1
+    }
+
+    return texture;
+}
+
+/**
+ * Converts a flat, row-major linear Color buffer
+ * into our highly optimized Tiled / Morton structure for Mip 0.
+ */
+static void _populate_mipmap(Mipmap mipmap, const Color* linear_input, Uint32 width) {
+    // Walk through the linear source dimensions
+    for (Uint32 row = 0; row < width; row++) {
+        for (Uint32 col = 0; col < width; col++) {
+            // Read linear pixel
+            Color pixel_color = linear_input[row * width + col];
+
+            // Calculate where it belongs in our tiled architecture
+            Uint32 tile_row = row >> TILE_WIDTH_BITS;
+            Uint32 tile_col = col >> TILE_WIDTH_BITS;
+            Uint32 pixel_row = row & (TILE_WIDTH - 1);
+            Uint32 pixel_col = col & (TILE_WIDTH - 1);
+
+            Uint32 tile_index = (tile_row * mipmap.width_in_tiles) + tile_col;
+            Uint32 tile_offset = tile_index * TILE_PIXELS;
+            Uint32 local_morton = _encode_morton_2d(pixel_col, pixel_row);
+
+            // Write to the contiguous tiled pool
+            mipmap.pixels[tile_offset + local_morton] = pixel_color;
+        }
+    }
+}
+
+TiledTexture texture_load_from_file(const char* filepath)
 {
-    Texture texture = { 0 };
+    TiledTexture texture = { 0 };
     if (!filepath) 
         return texture;
     
-    Mipmap mipmap = { 0 };
-
     int width = 0;
     int height = 0;
     int placeholder = 0;
-
+    
     // Force RGBA so renderer uses a consistent format.
     Color* pixels = stbi_load(filepath, &width, &height, &placeholder, 4);
 
@@ -25,67 +184,68 @@ Texture texture_load_from_file(const char* filepath)
         return texture;
     }
 
-    mipmap.width = (Uint32)width;
-    mipmap.height = (Uint32)height;
-    mipmap.pixels = pixels;
-
-    texture.num_levels = (Uint8)log2f(min(width, height)) + 1;
-    texture.mipmaps = malloc(texture.num_levels * sizeof(Mipmap));
-    texture.mipmaps[0] = mipmap;
-    _generate_mipmaps(texture);
+    texture = create_tiled_texture(width, height);
+    _populate_mipmap(texture.mipmaps[0], pixels, width);
+    _generate_sub_mipmaps(texture);
 
     return texture;
 }
 
 // We assume square image in the power of 2
-static void _generate_mipmaps(Texture texture) {
+static void _generate_sub_mipmaps(TiledTexture texture) {
     Mipmap original_image = texture.mipmaps[0];
     for (Uint8 i = 1; i < texture.num_levels; i++) {
         Uint16 new_width = 1 << (texture.num_levels - 1 - i); // 2^(texture.num_levels - i)
         Uint16 kernel_width = 1 << i; // 2^i
         float kernel_size = kernel_width * kernel_width;
-
-        Mipmap* mipmap = malloc(sizeof(Mipmap));
-        if (!mipmap) {
-            SDL_LogError(1, "Failed creating mipmap");
-            return;
-        }
-        Color* pixels = malloc(new_width * new_width * sizeof(Color));
-        if (!pixels) {
-            SDL_LogError(1, "Failed creating mipmap");
-            return;
-        }
+        Mipmap mipmap = texture.mipmaps[i];
 
         for (Uint16 row = 0; row < new_width; row++) {
             for (Uint16 col = 0; col < new_width; col++) {
-                float sum_r, sum_g, sum_b, sum_a;
-                sum_r = sum_g = sum_b = sum_a = 0;
+                float sum_r = 0.f;
+                float sum_g = 0.f;
+                float sum_b = 0.f;
+                float sum_a = 0.f;
+
+                // Map target (row,col) to the bounding box anchor in Mip 0
+                Uint32 original_start_row = row * kernel_width;
+                Uint32 original_start_col = col * kernel_width;
+
                 for (Uint16 kernel_row = 0; kernel_row < kernel_width; kernel_row++) {
                     for (Uint16 kernel_col = 0; kernel_col < kernel_width; kernel_col++) {
-                        Uint32 original_image_idx = (row * kernel_width + kernel_row) * original_image.width 
-                            + col * kernel_width + kernel_col;
-                        Color original_pixel = original_image.pixels[original_image_idx];
+                        Uint32 original_row = original_start_row + kernel_row;
+                        Uint32 original_col = original_start_col + kernel_col;
+
+                        Color original_pixel = _sample_tiled_pixel(&original_image, original_row, original_col);
                         sum_r += (float)original_pixel.r;
                         sum_g += (float)original_pixel.g;
                         sum_b += (float)original_pixel.b;
                         sum_a += (float)original_pixel.a;
                     }
                 }
-                Uint32 new_idx = row * new_width + col;
-                pixels[new_idx].r = (Uint8)(sum_r / kernel_size);
-                pixels[new_idx].g = (Uint8)(sum_g / kernel_size);
-                pixels[new_idx].b = (Uint8)(sum_b / kernel_size);
-                pixels[new_idx].a = (Uint8)(sum_a / kernel_size);
+                Color average_color = {
+                    .r = (Uint8)(sum_r / kernel_size),
+                    .g = (Uint8)(sum_g / kernel_size),
+                    .b = (Uint8)(sum_b / kernel_size),
+                    .a = (Uint8)(sum_a / kernel_size)
+                };
+                // Compute destination tile parameters
+                Uint32 mipmap_tile_row = row >> TILE_WIDTH_BITS;
+                Uint32 mipmap_tile_col = col >> TILE_WIDTH_BITS;
+                Uint32 mipmap_pixel_row = row & (TILE_WIDTH - 1);
+                Uint32 mipmap_pixel_col = col & (TILE_WIDTH - 1);
+
+                uint32_t mipmap_tile_idx = (mipmap_tile_row * mipmap.width_in_tiles) + mipmap_tile_col;
+                uint32_t mipmap_tile_offset = mipmap_tile_idx * TILE_PIXELS;
+                uint32_t mipmap_morton = _encode_morton_2d(mipmap_pixel_col, mipmap_pixel_row);
+
+                mipmap.pixels[mipmap_tile_offset + mipmap_morton] = average_color;
             }
         }
-        mipmap->pixels = pixels;
-        mipmap->width = new_width;
-        mipmap->height = new_width;
-        texture.mipmaps[i] = *mipmap;
     }
 }
 
-void texture_free(Texture* texture)
+void texture_free(TiledTexture* texture)
 {
     if (!texture || texture->num_levels == 0)
         return;
@@ -116,12 +276,12 @@ TextureBank texture_bank_create(Uint32 capacity)
         capacity = 4;
     
     bank.capacity = capacity;
-    bank.textures = malloc(sizeof(Texture) * bank.capacity);
+    bank.textures = malloc(sizeof(TiledTexture) * bank.capacity);
     if (!bank.textures) {
         bank.capacity = 0;
         return bank;
     }
-    memset(bank.textures, 0, sizeof(Texture) * bank.capacity);
+    memset(bank.textures, 0, sizeof(TiledTexture) * bank.capacity);
     return bank;
 }
 
@@ -139,9 +299,9 @@ void texture_bank_free(TextureBank* bank)
     bank->capacity = 0;
 }
 
-Texture texture_clone(const Texture src)
+TiledTexture texture_clone(const TiledTexture src)
 {
-    Texture copy = { 0 };
+    TiledTexture copy = { 0 };
     copy.num_levels = src.num_levels;
 
     if (src.mipmaps && copy.num_levels > 0)
@@ -181,7 +341,7 @@ TextureBank texture_bank_deep_copy(const TextureBank* src)
 
     if (dst.count == 0) return dst;
 
-    dst.textures = calloc(dst.capacity ? dst.capacity : dst.count, sizeof(Texture));
+    dst.textures = calloc(dst.capacity ? dst.capacity : dst.count, sizeof(TiledTexture));
     if (!dst.textures) return dst;
 
     for (Uint32 i = 0; i < src->count; i++) {
@@ -191,19 +351,19 @@ TextureBank texture_bank_deep_copy(const TextureBank* src)
     return dst;
 }
 
-Uint32 texture_bank_add(TextureBank* bank, Texture mipmap) {
+Uint32 texture_bank_add(TextureBank* bank, TiledTexture mipmap) {
     if (!bank->textures && bank->capacity == 0) {
         *bank = texture_bank_create(4);
     }
     if (bank->count + 1 >= bank->capacity) {
         Uint32 new_capacity = bank->capacity * 2;
-        Texture* resized = realloc(bank->textures, sizeof(Texture) * new_capacity);
+        TiledTexture* resized = realloc(bank->textures, sizeof(TiledTexture) * new_capacity);
         if (!resized) {
             return TEXTURE_NONE;
         }
 
         bank->textures = resized;
-        memset(&bank->textures[bank->capacity], 0, sizeof(Texture) * (new_capacity - bank->capacity));
+        memset(&bank->textures[bank->capacity], 0, sizeof(TiledTexture) * (new_capacity - bank->capacity));
         bank->capacity = new_capacity;
     }
     bank->textures[bank->count++] = mipmap;
@@ -212,7 +372,7 @@ Uint32 texture_bank_add(TextureBank* bank, Texture mipmap) {
 
 Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath)
 {
-    Texture texture = texture_load_from_file(filepath);
+    TiledTexture texture = texture_load_from_file(filepath);
     if (texture.num_levels == 0) {
         return TEXTURE_NONE;
     }
@@ -238,10 +398,10 @@ Color texture_sample_nearest(const Mipmap mipmap, float u, float v)
     float uu = u - floorf(u);
     float vv = v - floorf(v);
 
-    Uint32 x = (Uint32)(uu * (float)texture->width) % texture->width;
-    Uint32 y = (Uint32)(vv * (float)texture->height) % texture->height;
+    Uint32 col = (Uint32)(uu * (float)texture->width) % texture->width;
+    Uint32 row = (Uint32)(vv * (float)texture->height) % texture->height;
 
-    Uint32 index = y * texture->width + x;
+    Uint32 index = row * texture->width + col;
     pixel.r = texture->pixels[index].r;
     pixel.g = texture->pixels[index].g;
     pixel.b = texture->pixels[index].b;
@@ -260,56 +420,36 @@ Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
     float uu = u - floorf(u);
     float vv = v - floorf(v);
 
-    float x = uu * (float)(mipmap.width - 1);
-    float y = vv * (float)(mipmap.height - 1);
+    float row = vv * (float)(mipmap.height - 1);
+    float col = uu * (float)(mipmap.width - 1);
 
-    Uint32 x0 = (Uint32)floorf(x);
-    Uint32 y0 = (Uint32)floorf(y);
-    Uint32 x1 = clamp_u32(x0 + 1, 0, mipmap.width - 1);
-    Uint32 y1 = clamp_u32(y0 + 1, 0, mipmap.height - 1);
+    Uint32 row0 = (Uint32)floorf(row);
+    Uint32 col0 = (Uint32)floorf(col);
+    Uint32 row1 = clamp_u32(row0 + 1, 0, mipmap.height - 1);
+    Uint32 col1 = clamp_u32(col0 + 1, 0, mipmap.width - 1);
 
-    float tx = x - (float)x0;
-    float ty = y - (float)y0;
+    float t_row = row - (float)row0;
+    float t_col = col - (float)col0;
     
-    Uint32 idx00 = y0 * mipmap.width + x0;
-    Uint32 idx10 = y0 * mipmap.width + x1;
-    Uint32 idx01 = y1 * mipmap.width + x0;
-    Uint32 idx11 = y1 * mipmap.width + x1;
+    Color pixel00 = _sample_tiled_pixel(&mipmap, row0, col0);
+    Color pixel01 = _sample_tiled_pixel(&mipmap, row0, col1);
+    Color pixel10 = _sample_tiled_pixel(&mipmap, row1, col0);
+    Color pixel11 = _sample_tiled_pixel(&mipmap, row1, col1);
+ 
+    float r0 = pixel00.r + (pixel01.r - pixel00.r) * t_col;
+    float g0 = pixel00.g + (pixel01.g - pixel00.g) * t_col;
+    float b0 = pixel00.b + (pixel01.b - pixel00.b) * t_col;
+    float a0 = pixel00.a + (pixel01.a - pixel00.a) * t_col;
 
-    float r00 = (float)mipmap.pixels[idx00].r;
-    float g00 = (float)mipmap.pixels[idx00].g;
-    float b00 = (float)mipmap.pixels[idx00].b;
-    float a00 = (float)mipmap.pixels[idx00].a;
+    float r1 = pixel10.r + (pixel11.r - pixel10.r) * t_col;
+    float g1 = pixel10.g + (pixel11.g - pixel10.g) * t_col;
+    float b1 = pixel10.b + (pixel11.b - pixel10.b) * t_col;
+    float a1 = pixel10.a + (pixel11.a - pixel10.a) * t_col;
 
-    float r10 = (float)mipmap.pixels[idx10].r;
-    float g10 = (float)mipmap.pixels[idx10].g;
-    float b10 = (float)mipmap.pixels[idx10].b;
-    float a10 = (float)mipmap.pixels[idx10].a;
-
-    float r01 = (float)mipmap.pixels[idx01].r;
-    float g01 = (float)mipmap.pixels[idx01].g;
-    float b01 = (float)mipmap.pixels[idx01].b;
-    float a01 = (float)mipmap.pixels[idx01].a;
-
-    float r11 = (float)mipmap.pixels[idx11].r;
-    float g11 = (float)mipmap.pixels[idx11].g;
-    float b11 = (float)mipmap.pixels[idx11].b;
-    float a11 = (float)mipmap.pixels[idx11].a;
-
-    float r0 = r00 + (r10 - r00) * tx;
-    float g0 = g00 + (g10 - g00) * tx;
-    float b0 = b00 + (b10 - b00) * tx;
-    float a0 = a00 + (a10 - a00) * tx;
-
-    float r1 = r01 + (r11 - r01) * tx;
-    float g1 = g01 + (g11 - g01) * tx;
-    float b1 = b01 + (b11 - b01) * tx;
-    float a1 = a01 + (a11 - a01) * tx;
-
-    pixel.r = (Uint8)(r0 + (r1 - r0) * ty);
-    pixel.g = (Uint8)(g0 + (g1 - g0) * ty);
-    pixel.b = (Uint8)(b0 + (b1 - b0) * ty);
-    pixel.a = (Uint8)(a0 + (a1 - a0) * ty);
+    pixel.r = (Uint8)(r0 + (r1 - r0) * t_row);
+    pixel.g = (Uint8)(g0 + (g1 - g0) * t_row);
+    pixel.b = (Uint8)(b0 + (b1 - b0) * t_row);
+    pixel.a = (Uint8)(a0 + (a1 - a0) * t_row);
 
     return pixel;
 }
@@ -321,7 +461,7 @@ inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
     return value;
 }
 
-Color texture_sample_trilinear(const Texture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
+Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
 {
     Mipmap original_image = texture.mipmaps[0];
 

@@ -116,7 +116,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
         world_objects->triangle_texture_indices[triangle_index] <
         world_objects->texture_bank.count;
     
-    Texture texture;
+    TiledTexture texture;
     if (has_texture) {
         Uint32 texture_index = world_objects->triangle_texture_indices[triangle_index];
         texture = world_objects->texture_bank.textures[texture_index];

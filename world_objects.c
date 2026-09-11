@@ -249,7 +249,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
             glm_vec2_copy(world_objects[i]->uvs[j], objects->uvs[concat_idx]);
         }
         for (Uint32 j = 0; j < world_objects[i]->texture_bank.count; j++) {
-            Texture tex_copy = texture_clone(world_objects[i]->texture_bank.textures[j]);
+            TiledTexture tex_copy = texture_clone(world_objects[i]->texture_bank.textures[j]);
             texture_bank_add(&objects->texture_bank, tex_copy);
         }
         for (Uint32 j = 0; j < world_objects[i]->num_triangles; j++) {
