@@ -194,65 +194,85 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
 
         // Clamp y boundaries to frame boundaries
         y_min = y_min < 0 ? 0 : y_min;
-        y_max = y_max >= (int)frame_height ? y_max = frame_height - 1 : y_max;
+        y_max = y_max >= (int)frame_height ? frame_height - 1 : y_max;
+
+        // Align y bounds to even numbers to prevent incomplete quad cuts
+        y_min &= ~1;
 
         if (y_min <= y_max) {
             // Initialize barycentric coordinates at first pixel center
             float first_pixel_center_y = (float)y_min + 0.5f;
             float first_x_minus_C = first_pixel_center_x - Cx;
             float first_y_minus_C = first_pixel_center_y - Cy;
-            float A_weight = (first_x_minus_C * dA_dx) + (first_y_minus_C * dA_dy);
-            float B_weight = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
-
-            float interpolated_depth = inv_Cz + inv_Az_minus_C * A_weight + inv_Bz_minus_C * B_weight;
-            float inv_interp_depth = 1.f / interpolated_depth;
-
-            float u = (*C_uv)[0] + Auv_minus_C[0] * A_weight + Buv_minus_C[0] * B_weight;
-            float v = (*C_uv)[1] + Auv_minus_C[1] * A_weight + Buv_minus_C[1] * B_weight;
-
-            float pixel_color_channel[4];
-            for (int channel = 0; channel < 4; channel++) {
-                pixel_color_channel[channel] = C_color[channel]
-                    + Acolor_minus_C[channel] * A_weight
-                    + Bcolor_minus_C[channel] * B_weight;
-            }
-
-            int pixel_idx = y_min * frame_width + current_x;
+            
+            // Base weights for the top-left corner of the quad [x, y]
+            float base_wA = (first_x_minus_C * dA_dx) + (first_y_minus_C * dA_dy);
+            float base_wB = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
 
             // Row loop
-            for (int current_y = y_min; current_y <= y_max; current_y++) {
-                if (interpolated_depth > z_buffer[pixel_idx]) {
-                    z_buffer[pixel_idx] = interpolated_depth;
+            // Step rows down by 2
+            // Step rows vertically by 2 to maximize L1 texture cache locality
+            for (int current_y = y_min; current_y <= y_max; current_y += 2) {
 
-                    Color interpolated_color;
-                    if (has_texture && texture.num_levels > 0)
-                    {
-                        float interpolated_u = u / interpolated_depth;
-                        float interpolated_v = v / interpolated_depth;
-                        vec2 scaled_duv_dx, scaled_duv_dy;
-                        glm_vec2_scale(duv_dx, inv_interp_depth, scaled_duv_dx);
-                        glm_vec2_scale(duv_dy, inv_interp_depth, scaled_duv_dy);
-                        interpolated_color = texture_sample_trilinear(texture, interpolated_u, interpolated_v, scaled_duv_dx, scaled_duv_dy);
+                for (int qy = 0; qy < 2; qy++) {
+                    int py = current_y + qy;
+                    if (py > y_max) continue;
+
+                    // Increment weights vertically
+                    float wA = base_wA + (qy * dA_dy);
+                    float wB = base_wB + (qy * dB_dy);
+                    float wC = 1.0f - wA - wB;
+
+                    if (wA >= 0.0f && wB >= 0.0f && wC >= 0.0f) {
+                        float interpolated_depth = inv_Cz + inv_Az_minus_C * wA + inv_Bz_minus_C * wB;
+                        int pixel_idx = py * frame_width + current_x;
+
+                        if (interpolated_depth > z_buffer[pixel_idx]) {
+                            z_buffer[pixel_idx] = interpolated_depth;
+
+                            Uint32 final_color = 0xFFFFFFFF;
+                            if (has_texture) {
+                                float z = 1.0f / interpolated_depth;
+
+                                float u = ((*C_uv)[0] + Auv_minus_C[0] * wA + Buv_minus_C[0] * wB) * z;
+                                float v = ((*C_uv)[1] + Auv_minus_C[1] * wA + Buv_minus_C[1] * wB) * z;
+
+                                vec2 scaled_duv_dx, scaled_duv_dy;
+                                glm_vec2_scale(duv_dx, z, scaled_duv_dx);
+                                glm_vec2_scale(duv_dy, z, scaled_duv_dy);
+
+                                // Invoke your trilinear sampler pipeline cleanly
+                                Color texel = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
+                                final_color = _color_to_uint32(texel);
+                            }
+                            else {
+                                // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
+                                float r = C_color[0] + Acolor_minus_C[0] * wA + Bcolor_minus_C[0] * wB;
+                                float g = C_color[1] + Acolor_minus_C[1] * wA + Bcolor_minus_C[1] * wB;
+                                float b = C_color[2] + Acolor_minus_C[2] * wA + Bcolor_minus_C[2] * wB;
+
+                                // Clamp the interpolated float channels to valid 0-255 bounds before casting
+                                int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
+                                int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
+                                int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
+
+                                Color fallback_color = {
+                                    .r = ir,
+                                    .g = ig,
+                                    .b = ib,
+                                    .a = 255
+                                };
+
+                                final_color = _color_to_uint32(fallback_color);
+                            }
+
+                            frame[pixel_idx] = final_color;
+                        }
                     }
-                    else {
-                        glm_vec4_clamp(pixel_color_channel, 0.f, 255.f);
-                        interpolated_color.r = (Uint8)pixel_color_channel[0];
-                        interpolated_color.g = (Uint8)pixel_color_channel[1];
-                        interpolated_color.b = (Uint8)pixel_color_channel[2];
-                        interpolated_color.a = (Uint8)pixel_color_channel[3];
-                    }
-                    frame[pixel_idx] = _color_to_uint32(interpolated_color);
                 }
-                // Step down 1 pixel
-                A_weight += dA_dy;
-                B_weight += dB_dy;
-                interpolated_depth += dz_dy;
-                u += duv_dy[0];
-                v += duv_dy[1];
-                for (int channel = 0; channel < 4; channel++) {
-                    pixel_color_channel[channel] += dcolor_dy[channel];
-                }
-                pixel_idx += frame_width;
+                // Step base weights down by 2 vertical lines
+                base_wA += (dA_dy * 2.0f);
+                base_wB += (dB_dy * 2.0f);
             }
         }
         // Step to next column
