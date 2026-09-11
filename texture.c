@@ -1,45 +1,26 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "texture.h"
 #include "stb_image.h"
-
 #include <string.h>
-#include <immintrin.h>
 
 #if defined(_MSC_VER)
 #include <intrin.h>
 #elif defined(__GNUC__) || defined(__clang__)
 #include <cpuid.h>
+#include <immintrin.h>
 #endif
 
-// Runtime check for BMI2 (PDEP).
-// Returns non-zero when the CPU supports BMI2.
-static inline int _cpu_has_bmi2(void) {
-#if defined(_MSC_VER)
-    int regs[4] = { 0 };
-    __cpuidex(regs, 7, 0); // leaf 7, subleaf 0 -> EBX bit 8 = BMI2
-    return (regs[1] & (1 << 8)) != 0;
-#elif defined(__GNUC__) || defined(__clang__)
-    unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-    if (!__get_cpuid_count(7, 0, &eax, &ebx, &ecx, &edx))
-        return 0;
-    return (ebx & (1u << 8)) != 0; // EBX bit 8 = BMI2
-#else
-    return 0;
+// Force BMI2 target for GCC/Clang just for this block
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((target("bmi2")))
 #endif
+static uint32_t _encode_morton_2d_pdep(uint32_t x, uint32_t y) {
+    return _pdep_u32(x, 0x55555555u) | _pdep_u32(y, 0xAAAAAAAAu);
 }
-
-#if defined(__BMI2__)
-static inline uint32_t _encode_morton_2d_pdep(uint32_t x, uint32_t y) {
-    // Masks to spread bits into every second position (e.g., 00000abc -> 0a0b0c)
-    uint32_t x_spread = _pdep_u32(x, 0x55555555u);
-    uint32_t y_spread = _pdep_u32(y, 0xAAAAAAAAu);
-    return x_spread | y_spread;
-}
-#endif
 
 static inline uint32_t _encode_morton_2d_scalar(uint32_t x, uint32_t y) {
-    // Portable scalar fallback: interleave bits manually
     uint32_t index = 0u;
+    // Keeping this inline allows the compiler to unroll this seamlessly
     for (int i = 0; i < TILE_WIDTH_BITS; i++) {
         index |= (((x >> i) & 1u) << (i * 2));
         index |= (((y >> i) & 1u) << (i * 2 + 1));
@@ -47,29 +28,72 @@ static inline uint32_t _encode_morton_2d_scalar(uint32_t x, uint32_t y) {
     return index;
 }
 
-/* Dispatch-on-first-call via a function pointer.
-   - First call goes to init, which queries CPU and switches the pointer.
-   - Subsequent calls are a single indirect call to the chosen implementation.
-*/
-static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y);
-static uint32_t(*encode_morton_2d_ptr)(uint32_t, uint32_t) = _encode_morton_2d_init;
+// Safer Runtime Check: Rejects AMD unless it's Zen 4 (Family 19h / Model 90h+ or Family 1Ah+)
+static int _cpu_has_fast_bmi2(void) {
+    unsigned int regs[4] = { 0 };
 
-static inline uint32_t _encode_morton_2d(uint32_t x, uint32_t y) {
-    return encode_morton_2d_ptr(x, y);
+#if defined(_MSC_VER)
+    __cpuid((int*)regs, 0);
+#elif defined(__GNUC__) || defined(__clang__)
+    if (!__get_cpuid(0, &regs[0], &regs[1], &regs[2], &regs[3])) return 0;
+#else
+    return 0;
+#endif
+
+    // Check if vendor is "AuthenticAMD"
+    int is_amd = (regs[1] == 0x68747541 && regs[3] == 0x69746e65 && regs[2] == 0x444d4163);
+
+    // Get feature flags (Leaf 7)
+#if defined(_MSC_VER)
+    __cpuidex((int*)regs, 7, 0);
+#else
+    __get_cpuid_count(7, 0, &regs[0], &regs[1], &regs[2], &regs[3]);
+#endif
+
+    int has_bmi2 = (regs[1] & (1 << 8)) != 0;
+    if (!has_bmi2) return 0;
+
+    // If it's AMD, we must check the Family to avoid slow microcoded PDEP
+    if (is_amd) {
+#if defined(_MSC_VER)
+        __cpuid((int*)regs, 1);
+#else
+        __get_cpuid(1, &regs[0], &regs[1], &regs[2], &regs[3]);
+#endif
+        unsigned int family = ((regs[0] >> 8) & 0xF);
+        unsigned int extended_family = ((regs[0] >> 20) & 0xFF);
+        unsigned int total_family = family + extended_family;
+
+        // AMD Family 25 (0x19) is Zen 3/4. Zen 4 models are >= 0x60. 
+        // Family 26 (0x1A) is Zen 5.
+        if (total_family < 25) return 0; // Reject Zen 1, Zen+, Zen 2
+        if (total_family == 25) {
+            unsigned int model = ((regs[0] >> 4) & 0xF);
+            unsigned int extended_model = ((regs[0] >> 12) & 0xF);
+            unsigned int total_model = (extended_model << 4) | model;
+            if (total_model < 0x60) return 0; // Reject Zen 3, accept Zen 4
+        }
+    }
+
+    return 1; // Intel or Zen 4+ AMD with fast hardware PDEP
 }
 
-static uint32_t _encode_morton_2d_init(uint32_t x, uint32_t y) {
-#if defined(__BMI2__)
-    if (_cpu_has_bmi2()) {
-        encode_morton_2d_ptr = _encode_morton_2d_pdep;
+// Public API: Fast Branch Dispatching instead of slow pointer tracking
+static inline uint32_t _encode_morton_2d(uint32_t x, uint32_t y) {
+    static int is_init = 0;
+    static int use_pdep = 0;
+
+    if (is_init == 0) {
+        use_pdep = _cpu_has_fast_bmi2();
+        is_init = 1;
+    }
+
+    if (use_pdep) {
+        return _encode_morton_2d_pdep(x, y);
     }
     else {
-        encode_morton_2d_ptr = _encode_morton_2d_scalar;
+        return _encode_morton_2d_scalar(x, y);
     }
-#else
-    encode_morton_2d_ptr = _encode_morton_2d_scalar;
-#endif
-    return encode_morton_2d_ptr(x, y);
 }
 
 // Looks up a pixel color inside a specific mipmap level.
@@ -251,7 +275,7 @@ void texture_free(TiledTexture* texture)
         return;
 
     free(texture->mipmaps);
-    free(texture->contiguous_buffer);
+    _aligned_free(texture->contiguous_buffer);
     texture->mipmaps = NULL;
     texture->contiguous_buffer = NULL;
     texture->num_levels = 0;
@@ -288,34 +312,45 @@ void texture_bank_free(TextureBank* bank)
     bank->capacity = 0;
 }
 
+static inline Uint32 _mipmap_padded_size(const Mipmap mipmap) {
+    Uint32 padded_w = mipmap.width_in_tiles * TILE_WIDTH;
+    Uint32 padded_h = ((mipmap.height + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
+    return padded_w * padded_h;
+}
+
 TiledTexture texture_clone(const TiledTexture src)
 {
     TiledTexture copy = { 0 };
+    if (!src.mipmaps || src.num_levels == 0)
+        return copy;
+
     copy.num_levels = src.num_levels;
+    copy.mipmaps = malloc(copy.num_levels * sizeof(Mipmap));
+    if (!copy.mipmaps) {
+        copy.num_levels = 0;
+        return copy;
+    }
 
-    if (src.mipmaps && copy.num_levels > 0)
-        copy.mipmaps = malloc(copy.num_levels * sizeof(Mipmap));
-        if (copy.mipmaps) {
-            for (Uint8 i = 0; i < copy.num_levels; i++) {
-                copy.mipmaps[i] = _mipmap_clone(src.mipmaps[i]);
-            }
-        }
-    return copy;
-}
+    Uint32 total_pixels = 0;
+    for (Uint8 i = 0; i < src.num_levels; i++)
+        total_pixels += _mipmap_padded_size(src.mipmaps[i]);
 
-static Mipmap _mipmap_clone(const Mipmap src)
-{
-    Mipmap copy = { 0 };
+    copy.contiguous_buffer = (Color*)_aligned_malloc(total_pixels * sizeof(Color), 64);
+    if (!copy.contiguous_buffer) {
+        free(copy.mipmaps);
+        copy.mipmaps = NULL;
+        copy.num_levels = 0;
+        return copy;
+    }
+    memcpy(copy.contiguous_buffer, src.contiguous_buffer, total_pixels * sizeof(Color));
 
-    copy.width = src.width;
-    copy.height = src.height;
-
-    if (src.pixels && src.width > 0 && src.height > 0) {
-        size_t pixel_count = (size_t)src.width * (size_t)src.height;
-        copy.pixels = malloc(pixel_count * sizeof(Color));
-        if (copy.pixels) {
-            memcpy(copy.pixels, src.pixels, pixel_count * sizeof(Color));
-        }
+    Color* cursor = copy.contiguous_buffer;
+    for (Uint8 i = 0; i < src.num_levels; i++) {
+        copy.mipmaps[i].width = src.mipmaps[i].width;
+        copy.mipmaps[i].height = src.mipmaps[i].height;
+        copy.mipmaps[i].width_in_tiles = src.mipmaps[i].width_in_tiles; // <-- the actual fix
+        copy.mipmaps[i].pixels = cursor;
+        cursor += _mipmap_padded_size(src.mipmaps[i]);
     }
     return copy;
 }
