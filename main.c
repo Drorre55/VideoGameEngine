@@ -190,7 +190,7 @@ SDL_AppResult render(int fps) {
 	for (int row = 0; row < WINDOW_HEIGHT; row++) {
 		for (int column = 0; column < WINDOW_WIDTH; column++) {
 			// rgba_to_uint32(0, 0, 255, 200);
-			framebuffer[row * WINDOW_WIDTH + column] = (0 << 24) | (0 << 16) | (255 << 8) | 200;
+			framebuffer[row * WINDOW_WIDTH + column] = (78 << 24) | (159 << 16) | (229 << 8) | 255;
 		}
 	}
 	world_objects_assign_to_copy(world_objects, world_objects_render_copy);

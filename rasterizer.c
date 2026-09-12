@@ -34,6 +34,18 @@ static inline _calc_step_constants(float* A_variable, float* B_variable, float* 
     }
 }
 
+inline float horizontal_average_m128(__m128 v) {
+    // Add high and low halves: (v0+v2, v1+v3, _, _)
+    __m128 sum64 = _mm_add_ps(v, _mm_movehl_ps(v, v));
+
+    // Add remaining elements: (v0+v1+v2+v3, _, _, _)
+    __m128 sum32 = _mm_add_ss(sum64, _mm_shuffle_ps(sum64, sum64, 1));
+
+    // Extract the scalar float result and divide by 4
+    float total = _mm_cvtss_f32(sum32);
+    return total / 4.0f;
+}
+
 static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
     vec3* vertices = world_objects->vertices;
@@ -225,19 +237,14 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
             __m128 v_Buv_minus_C_v = _mm_set1_ps(Buv_minus_C[1]);
             __m128 v_C_uv_u = _mm_set1_ps((*C_uv)[0]);
             __m128 v_C_uv_v = _mm_set1_ps((*C_uv)[1]);
-            // my test
-            __m128 v_du_dx = _mm_set1_ps(duv_dx[0]);
-            __m128 v_dv_dx = _mm_set1_ps(duv_dx[1]);
-            __m128 v_du_dy = _mm_set1_ps(duv_dy[0]);
-            __m128 v_dv_dy = _mm_set1_ps(duv_dy[1]);
 
             // Row loop
             // Step rows down by 2
             // Step rows vertically by 2 to maximize L1 texture cache locality
-            for (int current_y = y_min; current_y <= y_max; current_y += 2) {
+            for (int current_y = y_min; current_y <= y_max; current_y += 4) {
                 // 1. SETUP LOGICAL OFFSETS FOR PIXEL 0 (qy=0) AND PIXEL 1 (qy=1)
                 // Lane 0: offset 0.0f, Lane 1: offset 1.0f, Lanes 2 & 3: dummy values
-                __m128 v_qy = _mm_set_ps(0.0f, 0.0f, 1.0f, 0.0f);
+                __m128 v_qy = _mm_setr_ps(0.0f, 1.0f, 2.0f, 3.0f);
 
                 // 2. COMPUTE BARYCENTRIC WEIGHTS FOR BOTH PIXELS SIMULTANEOUSLY
                 __m128 v_base_wA = _mm_set1_ps(base_wA);
@@ -245,27 +252,23 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
 
                 __m128 v_wA = _mm_add_ps(v_base_wA, _mm_mul_ps(v_qy, v_dA_dy));
                 __m128 v_wB = _mm_add_ps(v_base_wB, _mm_mul_ps(v_qy, v_dB_dy));
-                __m128 v_wC = _mm_sub_ps(_mm_sub_ps(_mm_set1_ps(1.0f), v_wA), v_wB);
 
                 // 3. GENERATE THE COVERAGE MASK
                 // Check if wA >= 0, wB >= 0, wC >= 0 for both lanes
                 __m128 v_zero = _mm_setzero_ps();
                 __m128 mask_wA = _mm_cmpge_ps(v_wA, v_zero);
                 __m128 mask_wB = _mm_cmpge_ps(v_wB, v_zero);
-                __m128 mask_wC = _mm_cmpge_ps(v_wC, v_zero);
-                __m128 mask_coverage = _mm_and_ps(_mm_and_ps(mask_wA, mask_wB), mask_wC);
+                __m128 mask_coverage = _mm_and_ps(mask_wA, mask_wB);
 
                 // If both pixels fall completely outside the triangle, skip the entire math block
                 if (_mm_movemask_ps(mask_coverage) == 0) {
-                    base_wA += (dA_dy * 2.0f);
-                    base_wB += (dB_dy * 2.0f);
+                    base_wA += (dA_dy * 4.0f);
+                    base_wB += (dB_dy * 4.0f);
                     continue;
                 }
 
                 // 4. INTERPOLATE DEPTH (1/Z) & COMPUTE PERSPECTIVE CORRECTIVE Z
-                __m128 v_depth = _mm_add_ps(v_inv_Cz,
-                    _mm_add_ps(_mm_mul_ps(v_inv_Az_minus_C, v_wA), _mm_mul_ps(v_inv_Bz_minus_C, v_wB))
-                );
+                __m128 v_depth = _mm_add_ps(v_inv_Cz, _mm_add_ps(_mm_mul_ps(v_inv_Az_minus_C, v_wA), _mm_mul_ps(v_inv_Bz_minus_C, v_wB)));
 
                 // Vectorized division: z = 1.0f / depth
                 __m128 v_z = _mm_div_ps(_mm_set1_ps(1.0f), v_depth);
@@ -274,56 +277,57 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                 __m128 v_u = _mm_mul_ps(_mm_add_ps(v_C_uv_u, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_u, v_wA), _mm_mul_ps(v_Buv_minus_C_u, v_wB))), v_z);
                 __m128 v_v = _mm_mul_ps(_mm_add_ps(v_C_uv_v, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_v, v_wA), _mm_mul_ps(v_Buv_minus_C_v, v_wB))), v_z);
 
-                __m128 v_local_du_dx = _mm_mul_ps(v_du_dx, v_z);
-                __m128 v_local_dv_dx = _mm_mul_ps(v_dv_dx, v_z);
-                __m128 v_local_du_dy = _mm_mul_ps(v_du_dy, v_z);
-                __m128 v_local_dv_dy = _mm_mul_ps(v_dv_dy, v_z);
+                float avg_inv_depth = horizontal_average_m128(v_z);
+                vec2 scaled_duv_dx, scaled_duv_dy; 
+                glm_vec2_scale(duv_dx, avg_inv_depth, scaled_duv_dx);
+                glm_vec2_scale(duv_dy, avg_inv_depth, scaled_duv_dy);
+
+                __m128i int_v_qy = _mm_cvttps_epi32(v_qy);
+                __m128i v_py = _mm_add_epi32(int_v_qy, _mm_set1_epi32(current_y));
+                __m128i v_pixel_idx = _mm_add_epi32(_mm_mul_epi32(v_py, _mm_set1_epi32((int)frame_width)), _mm_set1_epi32(current_x));
 
                 // Extract computed lanes back to scalar values to perform Z-buffering and texturing
-                float u_lanes[4], v_lanes[4], depth_lanes[4], du_dx_lanes[4], dv_dx_lanes[4], du_dy_lanes[4], dv_dy_lanes[4];
+                float u_lanes[4], v_lanes[4], depth_lanes[4];
+                int py_lanes[4], pixel_idx_lanes[4];
                 _mm_storeu_ps(u_lanes, v_u);
                 _mm_storeu_ps(v_lanes, v_v);
                 _mm_storeu_ps(depth_lanes, v_depth);
-                _mm_storeu_ps(du_dx_lanes, v_local_du_dx);
-                _mm_storeu_ps(dv_dx_lanes, v_local_dv_dx);
-                _mm_storeu_ps(du_dy_lanes, v_local_du_dy);
-                _mm_storeu_ps(dv_dy_lanes, v_local_dv_dy);
+                _mm_storeu_epi32(py_lanes, v_py);
+                _mm_storeu_epi32(pixel_idx_lanes, v_pixel_idx);
                 int coverage_mask = _mm_movemask_ps(mask_coverage);
 
+
                 // 6. SCALAR BACKEND: BLIT TO FRAMEBUFFER
-                for (int qy = 0; qy < 2; qy++) {
+                // TODO: Check for if statements and index based array retrieval
+                for (int qy = 0; qy < 4; qy++) {
                     // Check if this specific lane is marked valid by the SIMD edge test
                     if (!(coverage_mask & (1 << qy))) continue;
 
-                    int py = current_y + qy;
-                    if (py > y_max) continue;
-                    float interpolated_depth = depth_lanes[qy];
-                    int pixel_idx = py * frame_width + current_x;
+                    if (py_lanes[qy] > y_max) continue;
+                    int pixel_idx = pixel_idx_lanes[qy]; // v_py * const + const -> easily vectorized
+                    float interpolated_depth = depth_lanes[qy]; // already vectorized
 
                     if (interpolated_depth > z_buffer[pixel_idx]) {
                         z_buffer[pixel_idx] = interpolated_depth;
 
-                        Uint32 final_color = 0xFFFFFFFF;
+                        Uint32 final_color = 0xFFFFFFFF; // const easily vectorized
                         if (has_texture) {
-                            vec2 scaled_duv_dx = { du_dx_lanes[qy], dv_dx_lanes[qy] };
-                            vec2 scaled_duv_dy = { du_dy_lanes[qy], dv_dy_lanes[qy] };
-
                             // Invoke your trilinear sampler pipeline cleanly
                             Color texel = texture_sample_trilinear(texture, u_lanes[qy], v_lanes[qy], scaled_duv_dx, scaled_duv_dy);
-                            final_color = _color_to_uint32(texel);
+                            final_color = _color_to_uint32(texel); // TODO: Check for array[4] manipulation for each group value
                         }
                         else {
-                            float wA_scalar = base_wA + (qy * dA_dy);
-                            float wB_scalar = base_wB + (qy * dB_dy);
+                            float wA_scalar = base_wA + (qy * dA_dy); // const + (v_qy * const) -> easily vectorized
+                            float wB_scalar = base_wB + (qy * dB_dy); // const + (v_qy * const) -> easily vectorized
                             // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
-                            float r = C_color[0] + Acolor_minus_C[0] * wA_scalar + Bcolor_minus_C[0] * wB_scalar;
-                            float g = C_color[1] + Acolor_minus_C[1] * wA_scalar + Bcolor_minus_C[1] * wB_scalar;
-                            float b = C_color[2] + Acolor_minus_C[2] * wA_scalar + Bcolor_minus_C[2] * wB_scalar;
+                            float r = C_color[0] + Acolor_minus_C[0] * wA_scalar + Bcolor_minus_C[0] * wB_scalar; // easily vectorized
+                            float g = C_color[1] + Acolor_minus_C[1] * wA_scalar + Bcolor_minus_C[1] * wB_scalar; // easily vectorized
+                            float b = C_color[2] + Acolor_minus_C[2] * wA_scalar + Bcolor_minus_C[2] * wB_scalar; // easily vectorized
 
                             // Clamp the interpolated float channels to valid 0-255 bounds before casting
-                            int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
-                            int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
-                            int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
+                            int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f); // Clamping easily vectorized
+                            int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f); // Clamping easily vectorized
+                            int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f); // Clamping easily vectorized
 
                             Color fallback_color = {
                                 .r = ir,
@@ -339,8 +343,8 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                     }
                 }
                 // Step base weights down by 2 vertical lines
-                base_wA += (dA_dy * 2.0f);
-                base_wB += (dB_dy * 2.0f);
+                base_wA += (dA_dy * 4.0f);
+                base_wB += (dB_dy * 4.0f);
             }
         }
         // Step to next column
