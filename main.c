@@ -25,8 +25,8 @@
 #define BENCHMARK_ROTATE_SPEED_RAD_PER_SEC 0.5f  // slow pan, ~28.6 deg/sec
 
 static SDL_Window* window = NULL;
-static SDL_Texture* texture = NULL;
-static SDL_Renderer* renderer = NULL;
+static SDL_Texture* sdl_texture = NULL;
+static SDL_Renderer* sdl_renderer = NULL;
 
 static Uint32* framebuffer;
 float* z_buffer;
@@ -99,13 +99,13 @@ SDL_AppResult initialize() {
 		return SDL_APP_FAILURE;
 	}
 
-	if (!SDL_CreateWindowAndRenderer("My game engine!!", WINDOW_WIDTH, WINDOW_HEIGHT, 0, &window, &renderer)) {
+	if (!SDL_CreateWindowAndRenderer("My game engine!!", WINDOW_WIDTH, WINDOW_HEIGHT, 0, &window, &sdl_renderer)) {
 		SDL_LogError(1, "Couldn't create window or renderer: %s", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
 
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
-	if (!texture) {
+	sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
+	if (!sdl_texture) {
 		SDL_LogError(1, "Couldn't create texture: %s", SDL_GetError());
 		return SDL_APP_FAILURE;
 	}
@@ -123,16 +123,16 @@ SDL_AppResult initialize() {
 	}
 
 	// Set text color to bright green for the FPS counter
-	SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-	SDL_RenderDebugText(renderer, 0.0f, 0.0f, " ");
+	SDL_SetRenderDrawColor(sdl_renderer, 0, 255, 0, 255);
+	SDL_RenderDebugText(sdl_renderer, 0.0f, 0.0f, " ");
 	show_fps = 0;
 
 	return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult shutdown() {
-	SDL_DestroyTexture(texture);
-	SDL_DestroyRenderer(renderer);
+	SDL_DestroyTexture(sdl_texture);
+	SDL_DestroyRenderer(sdl_renderer);
 	SDL_DestroyWindow(window);
 
 	free(framebuffer);
@@ -195,24 +195,24 @@ SDL_AppResult render(int fps) {
 	}
 	world_objects_assign_to_copy(world_objects, world_objects_render_copy);
 	run_graphics_pipeline(framebuffer, z_buffer, world_objects_render_copy, camera, WINDOW_WIDTH, WINDOW_HEIGHT);
-	SDL_UpdateTexture(texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(Uint32));
+	SDL_UpdateTexture(sdl_texture, NULL, framebuffer, WINDOW_WIDTH * sizeof(Uint32));
 
-	SDL_RenderClear(renderer);
+	SDL_RenderClear(sdl_renderer);
 
-	SDL_RenderTexture(renderer, texture, NULL, NULL);
+	SDL_RenderTexture(sdl_renderer, sdl_texture, NULL, NULL);
 
 	if (show_fps) {
 		// Scale up the tiny 8x8 debug font for better visibility
-		SDL_SetRenderScale(renderer, 2.0f, 2.0f);
+		SDL_SetRenderScale(sdl_renderer, 2.0f, 2.0f);
 
 		// Render text at coordinates (x=10, y=10)
-		SDL_RenderDebugTextFormat(renderer, 10.0f, 10.0f, "FPS: %d", fps);
+		SDL_RenderDebugTextFormat(sdl_renderer, 10.0f, 10.0f, "FPS: %d", fps);
 
 		// Reset scale for the rest of your game rendering
-		SDL_SetRenderScale(renderer, 1.0f, 1.0f);
+		SDL_SetRenderScale(sdl_renderer, 1.0f, 1.0f);
 	}
 
-	SDL_RenderPresent(renderer);
+	SDL_RenderPresent(sdl_renderer);
 
 	return SDL_APP_CONTINUE;
 }
