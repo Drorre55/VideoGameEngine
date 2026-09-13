@@ -125,12 +125,13 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     __m256 rho = _mm256_max_ps(_mm256_max_ps(dudx, dvdx), _mm256_max_ps(dudy, dvdy));
 
     // --- STAGE 3: SOTA LOG2 IEEE-754 BIT EXTRAPOLATION ---
-    __m256i rho_int = _mm256_castps_si256(rho);
-    __m256 rho_raw_float = _mm256_cvtepi32_ps(rho_int);
+    //__m256i rho_int = _mm256_castps_si256(rho);
+    //__m256 rho_raw_float = _mm256_cvtepi32_ps(rho_int);
 
-    __m256 magic_scale = _mm256_set1_ps(1.1920928955e-7f); // 1.0f / (1 << 23)
-    __m256 magic_offset = _mm256_set1_ps(127.0f);
-    __m256 lod = _mm256_fmsub_ps(rho_raw_float, magic_scale, magic_offset);
+    //__m256 magic_scale = _mm256_set1_ps(1.1920928955e-7f); // 1.0f / (1 << 23)
+    //__m256 magic_offset = _mm256_set1_ps(127.0f);
+    //__m256 lod = _mm256_fmsub_ps(rho_raw_float, magic_scale, magic_offset);
+    __m256 lod = _mm256_log2_ps(rho);
 
     // Boundary Mip Clamping [0.0f, Max_Mip]
     __m256 ceil_mip = _mm256_set1_ps((float)(texture->num_levels - 1));
