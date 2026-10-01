@@ -18,6 +18,7 @@ typedef struct {
 	Triangle* triangles;
 	Color* colors;
 	vec2* uvs;
+	vec3* normals;
 	Uint32* triangle_texture_indices;
 	TextureBank texture_bank;
 	Uint32 num_vertices;

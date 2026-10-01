@@ -43,7 +43,7 @@ vec3* calc_normal(vec3 a, vec3 b, vec3 c, vec3 dest) {
     vec3 e1, e2;
     glm_vec3_sub(b, a, e1);
     glm_vec3_sub(c, a, e2);
-    glm_vec3_cross(e1, e2, dest);
+    glm_vec3_cross(e2, e1, dest);
     glm_vec3_normalize(dest);
     return dest;
 }

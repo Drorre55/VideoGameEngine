@@ -17,14 +17,17 @@ void backface_culling(WorldObjects* world_objects, Camera* camera)
 		calc_normal(vertex1, vertex2, vertex3, normal);
 		glm_vec3_sub(vertex1, camera->global_coords, vertex_to_camera);
 
-		if (glm_vec3_dot(vertex_to_camera, normal) < 0) {
+		if (glm_vec3_dot(vertex_to_camera, normal) >= 0) {
 			world_objects->triangles[i] = 
 				world_objects->triangles[world_objects->num_triangles - 1];
+			glm_vec3_copy(world_objects->normals[world_objects->num_triangles - 1], world_objects->normals[i]);
 			world_objects->triangle_texture_indices[i] = 
 				world_objects->triangle_texture_indices[world_objects->num_triangles - 1];
 			world_objects->num_triangles--;
 			i--;
+			continue;
 		}
+		glm_vec3_copy(normal, world_objects->normals[i]);
 	}
 }
 
@@ -64,6 +67,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	Color* clipped_colors = malloc(sizeof(Color) * maximum_vertices);
 	vec2* clipped_uvs = malloc(sizeof(vec2) * maximum_vertices);
 	Triangle* clipped_triangles = malloc(sizeof(Triangle) * maximum_triangles);
+	vec3* clipped_normals = malloc(sizeof(vec3) * maximum_triangles);
 	Uint32* clipped_texture_indices = malloc(sizeof(Uint32) * maximum_triangles);
 
 	if (clipped_vertices == NULL || clipped_colors == NULL || clipped_uvs == NULL || clipped_triangles == NULL) {
@@ -72,6 +76,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		free(clipped_colors);
 		free(clipped_uvs);
 		free(clipped_triangles);
+		free(clipped_normals);
 		free(clipped_texture_indices);
 		return;
 	}
@@ -126,6 +131,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 				free(clipped_colors);
 				free(clipped_uvs);
 				free(clipped_triangles);
+				free(clipped_normals);
 				free(clipped_texture_indices);
 				return;
 			}
@@ -154,8 +160,9 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			clipped_triangles[triangle_count].corner2_idx = second_index;
 			clipped_triangles[triangle_count].corner3_idx = third_index;
 
-			clipped_texture_indices[triangle_count] =
-				camera_space_objects->triangle_texture_indices[triangle_index];
+			glm_vec3_copy(camera_space_objects->normals[triangle_index], clipped_normals[triangle_count]);
+			
+			clipped_texture_indices[triangle_count] = camera_space_objects->triangle_texture_indices[triangle_index];
 
 			triangle_count++;
 		}
@@ -165,12 +172,14 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	free(camera_space_objects->colors);
 	free(camera_space_objects->uvs);
 	free(camera_space_objects->triangles);
+	free(camera_space_objects->normals);
 	free(camera_space_objects->triangle_texture_indices);
 
 	camera_space_objects->vertices = clipped_vertices;
 	camera_space_objects->colors = clipped_colors;
 	camera_space_objects->uvs = clipped_uvs;
 	camera_space_objects->triangles = clipped_triangles;
+	camera_space_objects->normals = clipped_normals;
 	camera_space_objects->triangle_texture_indices = clipped_texture_indices;
 	camera_space_objects->num_vertices = vertex_count;
 	camera_space_objects->num_triangles = triangle_count;

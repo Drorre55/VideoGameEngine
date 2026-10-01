@@ -64,9 +64,21 @@ WorldObjects* load_obj_file(const char* filepath)
         fast_obj_destroy(mesh);
         return NULL;
     }
+    obj->normals = malloc(sizeof(vec3) * obj->num_triangles);
+    if (!obj->normals) {
+        SDL_LogError(1, "Error: Failed to allocate triangle textures for '%s'", filepath);
+        free(obj->triangles);
+        free(obj->uvs);
+        free(obj->colors);
+        free(obj->vertices);
+        free(obj);
+        fast_obj_destroy(mesh);
+        return NULL;
+    }
     obj->triangle_texture_indices = malloc(sizeof(Uint32) * obj->num_triangles);
     if (!obj->triangle_texture_indices) {
         SDL_LogError(1, "Error: Failed to allocate triangle textures for '%s'", filepath);
+        free(obj->normals);
         free(obj->triangles);
         free(obj->uvs);
         free(obj->colors);

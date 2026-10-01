@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(100, 10, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 5, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -76,9 +76,20 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         free(obj);
         return NULL;
     }
+    obj->normals = malloc(sizeof(vec3) * obj->num_triangles);
+    if (!obj->normals) {
+        SDL_LogError(1, "Error: Failed to generate ground mesh");
+        free(obj->triangles); 
+        free(obj->uvs);
+        free(obj->colors);
+        free(obj->vertices);
+        free(obj);
+        return NULL;
+    }
     obj->triangle_texture_indices = malloc(sizeof(Uint32) * obj->num_triangles);
     if (!obj->triangle_texture_indices) {
         SDL_LogError(1, "Error: Failed to generate ground mesh");
+        free(obj->normals);
         free(obj->triangles);
         free(obj->uvs);
         free(obj->colors);
@@ -113,7 +124,8 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
             perlin_noise(normalized_point, 3, gradients3) 
             + 0.5 * perlin_noise(normalized_point, 6, gradients6)
             + 0.25 * perlin_noise(normalized_point, 12, gradients12)
-            + 0.125 * perlin_noise(normalized_point, 24, gradients24));
+            + 0.125 * perlin_noise(normalized_point, 24, gradients24)
+            );
         obj->uvs[col][0] = _normalize_to_01(obj->vertices[col][0], (2.f * texture_tile_radius));
         obj->uvs[col][1] = _normalize_to_01(obj->vertices[col][2], (2.f * texture_tile_radius));
         
@@ -228,9 +240,19 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
             free(temp_colors);
             return NULL;
         }
+        Uint32* temp_normals = realloc(objects->normals, concat_num_triangles * sizeof(vec3));
+        if (!temp_normals) {
+            SDL_LogError(1, "Error: Failed to concat_world_objects");
+            free(temp_vertices);
+            free(temp_triangles);
+            free(temp_colors);
+            free(temp_uvs);
+            return NULL;
+        }
         Uint32* temp_triangle_texture_indices = realloc(objects->triangle_texture_indices, concat_num_triangles * sizeof(Uint32));
         if (!temp_triangle_texture_indices) {
             SDL_LogError(1, "Error: Failed to concat_world_objects");
+            free(temp_normals);
             free(temp_vertices);
             free(temp_triangles);
             free(temp_colors);
@@ -241,6 +263,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
         objects->triangles = temp_triangles;
         objects->colors = temp_colors;
         objects->uvs = temp_uvs;
+        objects->normals = temp_normals;
         objects->triangle_texture_indices = temp_triangle_texture_indices;
         Uint32 objects_texture_count = objects->texture_bank.count;
 
@@ -263,6 +286,8 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
                 world_triangle.corner2_idx + objects->num_vertices;
             objects->triangles[concat_idx].corner3_idx =
                 world_triangle.corner3_idx + objects->num_vertices;
+
+            glm_vec3_copy(objects->normals[concat_idx], world_objects[i]->normals[j]);
             
             if (world_objects[i]->triangle_texture_indices[j] != TEXTURE_NONE) {
                 objects->triangle_texture_indices[concat_idx] = 
@@ -290,6 +315,7 @@ void free_world_objects(WorldObjects* world_objects, bool deep_free_textures)
     free(world_objects->triangles);
     free(world_objects->colors);
     free(world_objects->uvs);
+    free(world_objects->normals);
     free(world_objects->triangle_texture_indices);
     if (deep_free_textures)
         texture_bank_free(&world_objects->texture_bank);
@@ -300,6 +326,7 @@ void free_world_objects(WorldObjects* world_objects, bool deep_free_textures)
     world_objects->triangles = NULL;
     world_objects->colors = NULL;
     world_objects->uvs = NULL;
+    world_objects->normals = NULL;
     world_objects->triangle_texture_indices = NULL;
     world_objects->num_vertices = 0;
     world_objects->num_triangles = 0;
@@ -354,6 +381,14 @@ WorldObjects* world_objects_deep_copy(const WorldObjects* src, bool deep_copy_te
         }
         memcpy(copy->uvs, src->uvs, sizeof(vec2) * src->num_vertices);
     }
+    if (src->num_triangles > 0 && src->normals != NULL) {
+        copy->normals = malloc(sizeof(vec3) * src->num_triangles);
+        if (!copy->normals) {
+            free_world_objects(copy, deep_copy_textures);
+            return NULL;
+        }
+        memcpy(copy->normals, src->normals, sizeof(vec3) * src->num_triangles);
+    }
     if (src->num_triangles > 0 && src->triangle_texture_indices != NULL) {
         copy->triangle_texture_indices = malloc(sizeof(Uint32) * src->num_triangles);
         if (!copy->triangle_texture_indices) {
@@ -376,5 +411,6 @@ void world_objects_assign_to_copy(const WorldObjects* src, WorldObjects* dest) {
     memcpy(dest->triangles, src->triangles, sizeof(Triangle) * src->num_triangles);
     memcpy(dest->colors, src->colors, sizeof(Color) * src->num_vertices);
     memcpy(dest->uvs, src->uvs, sizeof(vec2) * src->num_vertices);
+    memcpy(dest->normals, src->normals, sizeof(vec3) * src->num_triangles);
     memcpy(dest->triangle_texture_indices, src->triangle_texture_indices, sizeof(Uint32) * src->num_triangles);
 }

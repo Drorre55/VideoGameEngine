@@ -585,12 +585,12 @@ void transform_to_pixel_space(WorldObjects* on_screen_objects, Uint32 frame_widt
 	}
 }
 
-void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height, WorldObjects* on_screen_objects) {
+void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height, WorldObjects* on_screen_objects, vec3 light_direction) {
 	memset(z_buffer, 0, sizeof(float) * frame_width * frame_height);
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-        rasterize_triangle_bound_SIMD(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
-		//_draw_triangle(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
+        //rasterize_triangle_bound_SIMD(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
+		_draw_triangle(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
 	}
 }
 
@@ -618,7 +618,7 @@ inline float horizontal_average_m128(__m128 v) {
     return total / 4.0f;
 }
 
-static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
+static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, vec3 light_direction, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
     vec3* vertices = world_objects->vertices;
     Color* colors = world_objects->colors;
@@ -640,6 +640,9 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
     vec2* A_uv = uvs[sorted_triangle.corner1_idx];
     vec2* B_uv = uvs[sorted_triangle.corner2_idx];
     vec2* C_uv = uvs[sorted_triangle.corner3_idx];
+
+    vec3 normal;
+    glm_vec3_copy(world_objects->normals[triangle_index], normal);
 
     // Copy corner data to local variables for faster access
     float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
@@ -815,7 +818,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                         if (interpolated_depth > z_buffer[pixel_idx]) {
                             z_buffer[pixel_idx] = interpolated_depth;
 
-                            Uint32 final_color = 0xFFFFFFFF;
+                            Color final_color = { .r = 0, .g = 0, .r = 0, .a = 255 };
                             if (has_texture && 0) {
                                 float z = 1.0f / interpolated_depth;
 
@@ -827,8 +830,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                                 glm_vec2_scale(duv_dy, z, scaled_duv_dy);
 
                                 // Invoke your trilinear sampler pipeline cleanly
-                                Color texel = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
-                                final_color = _color_to_uint32(texel);
+                                final_color = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
                             }
                             else {
                                 // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
@@ -837,21 +839,24 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
                                 float b = C_color[2] + Acolor_minus_C[2] * wA + Bcolor_minus_C[2] * wB;
 
                                 // Clamp the interpolated float channels to valid 0-255 bounds before casting
-                                int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
-                                int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
-                                int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
+                                Uint8 ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
+                                Uint8 ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
+                                Uint8 ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
 
-                                Color fallback_color = {
+                                final_color = (Color) {
                                     .r = ir,
                                     .g = ig,
                                     .b = ib,
                                     .a = 255
                                 };
-
-                                final_color = _color_to_uint32(fallback_color);
                             }
-
-                            frame[pixel_idx] = final_color;
+                            float lighting = glm_vec3_dot(light_direction, normal);
+                            lighting = lighting > 0. ? 0. : lighting;
+                            lighting = fabsf(lighting);
+                            final_color.r = (Uint8)(fabsf(normal[0]) * 255. * lighting);//(Uint8)((float)(final_color.r) * lighting);
+                            final_color.g = (Uint8)(fabsf(normal[1]) * 255. * lighting);//(Uint8)((float)(final_color.g) * lighting);
+                            final_color.b = (Uint8)(fabsf(normal[2]) * 255. * lighting);//(Uint8)((float)(final_color.b) * lighting);
+                            frame[pixel_idx] = _color_to_uint32(final_color);
                         }
                     }
                 }
