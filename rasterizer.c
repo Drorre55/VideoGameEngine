@@ -4,7 +4,6 @@
 #include <immintrin.h>
 #define CORNERS 3
 
-
 #include <math.h>
 
 // --- HELPER FUNCTIONS ---
@@ -46,27 +45,84 @@ inline __m256 bilinear_filter_channel(__m256 tl, __m256 tr, __m256 bl, __m256 br
 // --- CORE PIPELINE IMPLEMENTATION ---
 
 // Evaluates texture filtering for a single mipmap pointer target
-void sample_mip_level_soa(const Color* mip_ptr, __m256i u0, __m256i v0,
+void sample_mip_level_soa(const Color* mip_ptr, Uint32 width_in_tiles, __m256i u0, __m256i v0,
     __m256i tex_w_mask, __m256i tex_h_mask, __m256i int_mask,
     __m256 alpha, __m256 beta,
     __m256* out_R, __m256* out_G, __m256* out_B, __m256* out_A)
 {
-    // GL_REPEAT Wrapping Model applied to coordinates and neighbors (+1)
+    // -------------------------------------------------------------------------
+   // 1. GL_REPEAT wrapping
+   // -------------------------------------------------------------------------
     __m256i u0_w = _mm256_and_si256(u0, tex_w_mask);
     __m256i v0_w = _mm256_and_si256(v0, tex_h_mask);
     __m256i u1_w = _mm256_and_si256(_mm256_add_epi32(u0, _mm256_set1_epi32(1)), tex_w_mask);
     __m256i v1_w = _mm256_and_si256(_mm256_add_epi32(v0, _mm256_set1_epi32(1)), tex_h_mask);
 
-    // Dynamic SIMD Bit Interleaving to map to flat Morton addresses
-    __m256i u0_intrlv = bit_interleave_AVX2(u0_w);
-    __m256i u1_intrlv = bit_interleave_AVX2(u1_w);
-    __m256i v0_intrlv = _mm256_slli_epi32(bit_interleave_AVX2(v0_w), 1);
-    __m256i v1_intrlv = _mm256_slli_epi32(bit_interleave_AVX2(v1_w), 1);
+    // -------------------------------------------------------------------------
+    // 2. Split each coordinate into:
+    //
+    //     tile coordinate : coordinate / 8
+    //     local coordinate: coordinate % 8
+    //
+    // The texture is ROW-MAJOR tiled, with Morton ordering only inside
+    // each 8x8 tile.
+    // -------------------------------------------------------------------------
 
-    __m256i morton_TL = _mm256_or_si256(u0_intrlv, v0_intrlv);
-    __m256i morton_TR = _mm256_or_si256(u1_intrlv, v0_intrlv);
-    __m256i morton_BL = _mm256_or_si256(u0_intrlv, v1_intrlv);
-    __m256i morton_BR = _mm256_or_si256(u1_intrlv, v1_intrlv);
+    __m256i tile_x0 = _mm256_srli_epi32(u0_w, 3);
+    __m256i tile_x1 = _mm256_srli_epi32(u1_w, 3);
+    __m256i tile_y0 = _mm256_srli_epi32(v0_w, 3);
+    __m256i tile_y1 = _mm256_srli_epi32(v1_w, 3);
+
+    __m256i local_x0 = _mm256_and_si256(u0_w, _mm256_set1_epi32(7));
+    __m256i local_x1 = _mm256_and_si256(u1_w, _mm256_set1_epi32(7));
+    __m256i local_y0 = _mm256_and_si256(v0_w, _mm256_set1_epi32(7));
+    __m256i local_y1 = _mm256_and_si256(v1_w, _mm256_set1_epi32(7));
+
+    // -------------------------------------------------------------------------
+    // 3. Row-major tile addresses
+    //
+    //     tile_index = tile_y * width_in_tiles + tile_x
+    // -------------------------------------------------------------------------
+
+    __m256i tiles_per_row = _mm256_set1_epi32(width_in_tiles);
+
+    __m256i tile_index_TL = _mm256_add_epi32(_mm256_mullo_epi32(tile_y0, tiles_per_row), tile_x0);
+    __m256i tile_index_TR = _mm256_add_epi32(_mm256_mullo_epi32(tile_y0, tiles_per_row), tile_x1);
+    __m256i tile_index_BL = _mm256_add_epi32(_mm256_mullo_epi32(tile_y1, tiles_per_row), tile_x0);
+    __m256i tile_index_BR = _mm256_add_epi32(_mm256_mullo_epi32(tile_y1, tiles_per_row), tile_x1);
+
+    // -------------------------------------------------------------------------
+    // 4. Morton order INSIDE each 8x8 tile
+    //
+    // local coordinates are only 0..7, so your existing bit_interleave()
+    // produces exactly the required 3-bit Morton spreading.
+    // -------------------------------------------------------------------------
+
+    __m256i x_TL = bit_interleave_AVX2(local_x0);
+    __m256i x_TR = bit_interleave_AVX2(local_x1);
+    __m256i y_TL = _mm256_slli_epi32(bit_interleave_AVX2(local_y0), 1);
+    __m256i y_BL = _mm256_slli_epi32(bit_interleave_AVX2(local_y1), 1);
+
+    __m256i local_morton_TL = _mm256_or_si256(x_TL, y_TL);
+    __m256i local_morton_TR = _mm256_or_si256(x_TR, y_TL);
+    __m256i local_morton_BL = _mm256_or_si256(x_TL, y_BL);
+    __m256i local_morton_BR = _mm256_or_si256(x_TR, y_BL);
+
+    // -------------------------------------------------------------------------
+    // 5. Convert tile index + local Morton index into the final pixel address
+    //
+    // Each 8x8 tile contains exactly 64 Color elements.
+    // -------------------------------------------------------------------------
+
+    __m256i tile_pixel_count = _mm256_set1_epi32(64);
+    __m256i morton_TL = _mm256_add_epi32(_mm256_mullo_epi32(tile_index_TL, tile_pixel_count), local_morton_TL);
+    __m256i morton_TR = _mm256_add_epi32(_mm256_mullo_epi32(tile_index_TR, tile_pixel_count), local_morton_TR);
+    __m256i morton_BL = _mm256_add_epi32(_mm256_mullo_epi32(tile_index_BL, tile_pixel_count), local_morton_BL);
+    __m256i morton_BR = _mm256_add_epi32(_mm256_mullo_epi32(tile_index_BR, tile_pixel_count), local_morton_BR);
+
+    // -------------------------------------------------------------------------
+    // 6. Gather the four bilinear pixels
+    // -------------------------------------------------------------------------
 
     // Hardware Masked Integer Gather requests (Safely rejects occluded lanes)
     __m256i zero_int = _mm256_setzero_si256();
@@ -103,8 +159,12 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     // Scale normalized values up to Base Mip level dimensions
     float base_w = (float)texture->mipmaps[0].width;
     float base_h = (float)texture->mipmaps[0].height;
-    __m256 u_tex = _mm256_mul_ps(u_vec, _mm256_set1_ps(base_w));
-    __m256 v_tex = _mm256_mul_ps(v_vec, _mm256_set1_ps(base_h));
+
+    __m256 u_frac = _mm256_sub_ps(u_vec, _mm256_floor_ps(u_vec));
+    __m256 v_frac = _mm256_sub_ps(v_vec, _mm256_floor_ps(v_vec));
+
+    __m256 u_tex = _mm256_mul_ps(u_frac, _mm256_set1_ps(base_w));
+    __m256 v_tex = _mm256_mul_ps(v_frac, _mm256_set1_ps(base_h));
 
     // Shuffles to compare horizontal/vertical quad execution space neighbors
     __m256 abs_mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7FFFFFFF));
@@ -118,20 +178,16 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     __m256 dudy = _mm256_and_ps(_mm256_sub_ps(u_tex, u_shuf_y), abs_mask);
     __m256 dvdy = _mm256_and_ps(_mm256_sub_ps(v_tex, v_shuf_y), abs_mask);
 
-    //// Extract maximum anisotropic bounding footprint footprint
-    //__m256 rho = _mm256_max_ps(_mm256_max_ps(dudx, dvdx), _mm256_max_ps(dudy, dvdy));
-
     // Multiply the normalized footprint bounds by the texture dimensions to map to texel-space delta footprints
     __m256 rho = _mm256_max_ps(_mm256_max_ps(dudx, dvdx), _mm256_max_ps(dudy, dvdy));
 
     // --- STAGE 3: SOTA LOG2 IEEE-754 BIT EXTRAPOLATION ---
-    //__m256i rho_int = _mm256_castps_si256(rho);
-    //__m256 rho_raw_float = _mm256_cvtepi32_ps(rho_int);
+    __m256i rho_int = _mm256_castps_si256(rho);
+    __m256 rho_raw_float = _mm256_cvtepi32_ps(rho_int);
 
-    //__m256 magic_scale = _mm256_set1_ps(1.1920928955e-7f); // 1.0f / (1 << 23)
-    //__m256 magic_offset = _mm256_set1_ps(127.0f);
-    //__m256 lod = _mm256_fmsub_ps(rho_raw_float, magic_scale, magic_offset);
-    __m256 lod = _mm256_log2_ps(rho);
+    __m256 magic_scale = _mm256_set1_ps(1.1920928955e-7f); // 1.0f / (1 << 23)
+    __m256 magic_offset = _mm256_set1_ps(127.0f);
+    __m256 lod = _mm256_fmsub_ps(rho_raw_float, magic_scale, magic_offset);
 
     // Boundary Mip Clamping [0.0f, Max_Mip]
     __m256 ceil_mip = _mm256_set1_ps((float)(texture->num_levels - 1));
@@ -197,8 +253,8 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     __m256i mask_w_Next = _mm256_set1_epi32(texture->mipmaps[next_mip_idx].width - 1);
     __m256i mask_h_Next = _mm256_set1_epi32(texture->mipmaps[next_mip_idx].height - 1);
 
-    sample_mip_level_soa(texture->mipmaps[current_mip_idx].pixels, u0_N, v0_N, mask_w_N, mask_h_N, int_mask, alpha_N, beta_N, &mipN_R, &mipN_G, &mipN_B, &mipN_A);
-    sample_mip_level_soa(texture->mipmaps[next_mip_idx].pixels, u0_Next, v0_Next, mask_w_Next, mask_h_Next, int_mask, alpha_Next, beta_Next, &mipNext_R, &mipNext_G, &mipNext_B, &mipNext_A);
+    sample_mip_level_soa(texture->mipmaps[current_mip_idx].pixels, texture->mipmaps[current_mip_idx].width_in_tiles, u0_N, v0_N, mask_w_N, mask_h_N, int_mask, alpha_N, beta_N, &mipN_R, &mipN_G, &mipN_B, &mipN_A);
+    sample_mip_level_soa(texture->mipmaps[next_mip_idx].pixels, texture->mipmaps[next_mip_idx].width_in_tiles, u0_Next, v0_Next, mask_w_Next, mask_h_Next, int_mask, alpha_Next, beta_Next, &mipNext_R, &mipNext_G, &mipNext_B, &mipNext_A);
 
     // --- STAGE 4, after current_mip_idx is extracted/clamped ---
     __m256 base_level = _mm256_set1_ps((float)current_mip_idx);
@@ -217,7 +273,7 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     __m256i out_R = _mm256_slli_epi32(_mm256_cvtps_epi32(final_R), 24);
     __m256i packed_output = _mm256_or_si256(_mm256_or_si256(out_R, out_G), _mm256_or_si256(out_B, out_A));
     // Update the buffers using native hardware masked stores
-// Extract split elements for 128-bit vector lanes
+    // Extract split elements for 128-bit vector lanes
     __m128i mask_row0 = _mm256_castsi256_si128(int_mask);
     __m128i mask_row1 = _mm256_extracti128_si256(int_mask, 1);
 
@@ -253,8 +309,8 @@ inline int min3(int a, int b, int c) {
 }
 
 // Helper to find the maximum of 3 integers
-inline int max3(int a, int b, int c) {
-    int m = a > b ? a : b;
+inline float fmax3(float a, float b, float c) {
+    float m = a > b ? a : b;
     return m > c ? m : c;
 }
 
@@ -314,16 +370,15 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         texture = world_objects->texture_bank.textures[texture_index];
     }
 
-
     // =========================================================================
     // STAGE 1: TRIANGLE SETUP & CONSTANT GENERATION
     // =========================================================================
 
     // 1. Calculate Cross-product area delta (Twice the triangle area)
-    float area = fabsf((v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y));
+    float area = (v1.x - v0.x) * (v2.y - v0.y) - (v2.x - v0.x) * (v1.y - v0.y);
 
     // Backface culling: Skip degenerate or back-facing triangles
-    if (area <= 0.0f) return;
+    if (fabsf(area) <= 0.0f) return;
     float inv_area = 1.0f / area;
 
     // 2. Precompute standard Edge Function Step Deltas
@@ -361,15 +416,15 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
 
     // 4. Bounding Box Setup aligned perfectly to 4x2 block chunks
     int min_x = (min3((int)v0.x, (int)v1.x, (int)v2.x)) & ~3; // Round down to multiple of 4
-    int max_x = (max3((int)v0.x, (int)v1.x, (int)v2.x) + 3) & ~3; // Round up to multiple of 4
+    int max_x = ((int)ceilf(fmax3(v0.x, v1.x, v2.x)) + 3) & ~3; // Round up to multiple of 4
     int min_y = (min3((int)v0.y, (int)v1.y, (int)v2.y)) & ~1; // Round down to multiple of 2
-    int max_y = (max3((int)v0.y, (int)v1.y, (int)v2.y) + 1) & ~1; // Round up to multiple of 2
+    int max_y = ((int)ceilf(fmax3(v0.y, v1.y, v2.y)) + 1) & ~1; // Round up to multiple of 2
 
     // Clip bounding box against screen bounds
     if (min_x < 0) min_x = 0;
     if (min_y < 0) min_y = 0;
-    if (max_x > frame_width)  max_x = frame_width;
-    if (max_y > frame_height) max_y = frame_height;
+    if (max_x > (int)frame_width)  max_x = frame_width;
+    if (max_y > (int)frame_height) max_y = frame_height;
 
     // =========================================================================
     // STAGE 2: FIXED AVX2 CONSTANTS FOR THE 4x2 PACKET
@@ -379,8 +434,8 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
     // Layout sequence matches depth buffer offset configuration:
     // Row Y  : (0,0), (1,0), (2,0), (3,0)
     // Row Y+1: (0,1), (1,1), (2,1), (3,1)
-    __m256 x_offsets = _mm256_setr_ps(0.0f, 1.0f, 2.0f, 3.0f, 0.0f, 1.0f, 2.0f, 3.0f);
-    __m256 y_offsets = _mm256_setr_ps(0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+    __m256 x_offsets = _mm256_setr_ps(0.5f, 1.5f, 2.5f, 3.5f, 0.5f, 1.5f, 2.5f, 3.5f);
+    __m256 y_offsets = _mm256_setr_ps(0.5f, 0.5f, 0.5f, 0.5f, 1.5f, 1.5f, 1.5f, 1.5f);
 
     // Broadcast setup gradients into wide vector registers
     __m256 vdE01_dx = _mm256_set1_ps(dE01_dx); __m256 vdE01_dy = _mm256_set1_ps(dE01_dy);
@@ -465,10 +520,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
                     __m256 u_over_z_vec = _mm256_add_ps(_mm256_set1_ps(v0.u), _mm256_add_ps(_mm256_mul_ps(dx, vdu_dx), _mm256_mul_ps(dy, vdu_dy)));
                     __m256 v_over_z_vec = _mm256_add_ps(_mm256_set1_ps(v0.v), _mm256_add_ps(_mm256_mul_ps(dx, vdv_dx), _mm256_mul_ps(dy, vdv_dy)));
 
-                    // 1-Cycle hardware reciprocal approximation of 1/w to get actual W depth
-                    __m256 z_approx = _mm256_rcp_ps(z_vec);
-                    // Newton-Raphson precision correction pass
-                    __m256 w_vec = _mm256_mul_ps(z_approx, _mm256_fnmadd_ps(z_vec, z_approx, _mm256_set1_ps(2.0f)));
+                    __m256 w_vec = _mm256_div_ps(_mm256_set1_ps(1.0f), z_vec);
 
                     // Reconstruct perfect perspective-correct U and V coordinates for your texturing loop!
                     __m256 u_vec = _mm256_mul_ps(u_over_z_vec, w_vec);
@@ -484,7 +536,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
                     __m256 final_B = _mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy)));
                     __m256 final_A = _mm256_set1_ps(v0.a);
                     // Assuming constant vertex alpha for solid shading
-                    // // Clamp float colors straight to [0.0f, 255.0f] range
+                    // Clamp float colors straight to [0.0f, 255.0f] range
                     __m256 max_color = _mm256_set1_ps(255.0f);
                     final_R = _mm256_min_ps(_mm256_max_ps(final_R, _mm256_setzero_ps()), max_color);
                     final_G = _mm256_min_ps(_mm256_max_ps(final_G, _mm256_setzero_ps()), max_color);
@@ -628,18 +680,18 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
 
     float dB_dx = ACy * inverse_triangle_area;
     float dB_dy = -ACx * inverse_triangle_area;
-    
+
     // Calc incremental progression constants
     float inv_Az_minus_C, inv_Bz_minus_C, dz_dx, dz_dy;
-    _calc_step_constants(&inv_Az, &inv_Bz, &inv_Cz, 1, dA_dx, dA_dy, dB_dx, dB_dy, &inv_Az_minus_C, 
+    _calc_step_constants(&inv_Az, &inv_Bz, &inv_Cz, 1, dA_dx, dA_dy, dB_dx, dB_dy, &inv_Az_minus_C,
         &inv_Bz_minus_C, &dz_dx, &dz_dy);
 
     vec2 Auv_minus_C, Buv_minus_C, duv_dx, duv_dy;
-    _calc_step_constants(A_uv, B_uv, C_uv, 2, dA_dx, dA_dy, dB_dx, dB_dy, Auv_minus_C, Buv_minus_C, 
+    _calc_step_constants(A_uv, B_uv, C_uv, 2, dA_dx, dA_dy, dB_dx, dB_dy, Auv_minus_C, Buv_minus_C,
         duv_dx, duv_dy);
 
     vec4 Acolor_minus_C, Bcolor_minus_C, dcolor_dx, dcolor_dy;
-    _calc_step_constants(A_color, B_color, C_color, 4, dA_dx, dA_dy, dB_dx, dB_dy, Acolor_minus_C, 
+    _calc_step_constants(A_color, B_color, C_color, 4, dA_dx, dA_dy, dB_dx, dB_dy, Acolor_minus_C,
         Bcolor_minus_C, dcolor_dx, dcolor_dy);
 
     const int has_texture =
@@ -648,7 +700,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
         world_objects->triangle_texture_indices[triangle_index] != TEXTURE_NONE &&
         world_objects->triangle_texture_indices[triangle_index] <
         world_objects->texture_bank.count;
-    
+
     TiledTexture texture;
     if (has_texture) {
         Uint32 texture_index = world_objects->triangle_texture_indices[triangle_index];
@@ -674,7 +726,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
      * ----------------------------------------------------------------
      */
 
-    // Slopes dy/dx.
+     // Slopes dy/dx.
     float AB_slope = fabsf(ABx) > 1e-8f ? ABy / ABx : 0.0f;
     float AC_slope = fabsf(ACx) > 1e-8f ? ACy / ACx : 0.0f;
     float BC_slope = fabsf(BCx) > 1e-8f ? BCy / BCx : 0.0f;
@@ -737,134 +789,75 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
             float first_pixel_center_y = (float)y_min + 0.5f;
             float first_x_minus_C = first_pixel_center_x - Cx;
             float first_y_minus_C = first_pixel_center_y - Cy;
-            
+
             // Base weights for the top-left corner of the quad [x, y]
             float base_wA = (first_x_minus_C * dA_dx) + (first_y_minus_C * dA_dy);
             float base_wB = (first_x_minus_C * dB_dx) + (first_y_minus_C * dB_dy);
 
-            // Pre-load your constant step derivatives into SIMD registers
-            __m128 v_dA_dy = _mm_set1_ps(dA_dy);
-            __m128 v_dB_dy = _mm_set1_ps(dB_dy);
-
-            __m128 v_inv_Az_minus_C = _mm_set1_ps(inv_Az_minus_C);
-            __m128 v_inv_Bz_minus_C = _mm_set1_ps(inv_Bz_minus_C);
-            __m128 v_inv_Cz = _mm_set1_ps(inv_Cz);
-
-            // Vectorize texture coordinate step constants (assuming uvs are 2D floats)
-            __m128 v_Auv_minus_C_u = _mm_set1_ps(Auv_minus_C[0]);
-            __m128 v_Auv_minus_C_v = _mm_set1_ps(Auv_minus_C[1]);
-            __m128 v_Buv_minus_C_u = _mm_set1_ps(Buv_minus_C[0]);
-            __m128 v_Buv_minus_C_v = _mm_set1_ps(Buv_minus_C[1]);
-            __m128 v_C_uv_u = _mm_set1_ps((*C_uv)[0]);
-            __m128 v_C_uv_v = _mm_set1_ps((*C_uv)[1]);
-
             // Row loop
             // Step rows down by 2
             // Step rows vertically by 2 to maximize L1 texture cache locality
-            for (int current_y = y_min; current_y <= y_max; current_y += 4) {
-                // 1. SETUP LOGICAL OFFSETS FOR PIXEL 0 (qy=0) AND PIXEL 1 (qy=1)
-                // Lane 0: offset 0.0f, Lane 1: offset 1.0f, Lanes 2 & 3: dummy values
-                __m128 v_qy = _mm_setr_ps(0.0f, 1.0f, 2.0f, 3.0f);
+            for (int current_y = y_min; current_y <= y_max; current_y += 2) {
 
-                // 2. COMPUTE BARYCENTRIC WEIGHTS FOR BOTH PIXELS SIMULTANEOUSLY
-                __m128 v_base_wA = _mm_set1_ps(base_wA);
-                __m128 v_base_wB = _mm_set1_ps(base_wB);
+                for (int qy = 0; qy < 2; qy++) {
+                    int py = current_y + qy;
+                    if (py > y_max) continue;
 
-                __m128 v_wA = _mm_add_ps(v_base_wA, _mm_mul_ps(v_qy, v_dA_dy));
-                __m128 v_wB = _mm_add_ps(v_base_wB, _mm_mul_ps(v_qy, v_dB_dy));
+                    // Increment weights vertically
+                    float wA = base_wA + (qy * dA_dy);
+                    float wB = base_wB + (qy * dB_dy);
+                    float wC = 1.0f - wA - wB;
 
-                // 3. GENERATE THE COVERAGE MASK
-                // Check if wA >= 0, wB >= 0, wC >= 0 for both lanes
-                __m128 v_zero = _mm_setzero_ps();
-                __m128 mask_wA = _mm_cmpge_ps(v_wA, v_zero);
-                __m128 mask_wB = _mm_cmpge_ps(v_wB, v_zero);
-                __m128 mask_coverage = _mm_and_ps(mask_wA, mask_wB);
+                    if (wA >= 0.0f && wB >= 0.0f && wC >= 0.0f) {
+                        float interpolated_depth = inv_Cz + inv_Az_minus_C * wA + inv_Bz_minus_C * wB;
+                        int pixel_idx = py * frame_width + current_x;
 
-                // If both pixels fall completely outside the triangle, skip the entire math block
-                if (_mm_movemask_ps(mask_coverage) == 0) {
-                    base_wA += (dA_dy * 4.0f);
-                    base_wB += (dB_dy * 4.0f);
-                    continue;
-                }
+                        if (interpolated_depth > z_buffer[pixel_idx]) {
+                            z_buffer[pixel_idx] = interpolated_depth;
 
-                // 4. INTERPOLATE DEPTH (1/Z) & COMPUTE PERSPECTIVE CORRECTIVE Z
-                __m128 v_depth = _mm_add_ps(v_inv_Cz, _mm_add_ps(_mm_mul_ps(v_inv_Az_minus_C, v_wA), _mm_mul_ps(v_inv_Bz_minus_C, v_wB)));
+                            Uint32 final_color = 0xFFFFFFFF;
+                            if (has_texture && 0) {
+                                float z = 1.0f / interpolated_depth;
 
-                // Vectorized division: z = 1.0f / depth
-                __m128 v_z = _mm_div_ps(_mm_set1_ps(1.0f), v_depth);
+                                float u = ((*C_uv)[0] + Auv_minus_C[0] * wA + Buv_minus_C[0] * wB) * z;
+                                float v = ((*C_uv)[1] + Auv_minus_C[1] * wA + Buv_minus_C[1] * wB) * z;
 
-                // 5. INTERPOLATE PERSPECTIVE-CORRECTED U & V COORDINATES
-                __m128 v_u = _mm_mul_ps(_mm_add_ps(v_C_uv_u, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_u, v_wA), _mm_mul_ps(v_Buv_minus_C_u, v_wB))), v_z);
-                __m128 v_v = _mm_mul_ps(_mm_add_ps(v_C_uv_v, _mm_add_ps(_mm_mul_ps(v_Auv_minus_C_v, v_wA), _mm_mul_ps(v_Buv_minus_C_v, v_wB))), v_z);
+                                vec2 scaled_duv_dx, scaled_duv_dy;
+                                glm_vec2_scale(duv_dx, z, scaled_duv_dx);
+                                glm_vec2_scale(duv_dy, z, scaled_duv_dy);
 
-                float avg_inv_depth = horizontal_average_m128(v_z);
-                vec2 scaled_duv_dx, scaled_duv_dy; 
-                glm_vec2_scale(duv_dx, avg_inv_depth, scaled_duv_dx);
-                glm_vec2_scale(duv_dy, avg_inv_depth, scaled_duv_dy);
+                                // Invoke your trilinear sampler pipeline cleanly
+                                Color texel = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
+                                final_color = _color_to_uint32(texel);
+                            }
+                            else {
+                                // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
+                                float r = C_color[0] + Acolor_minus_C[0] * wA + Bcolor_minus_C[0] * wB;
+                                float g = C_color[1] + Acolor_minus_C[1] * wA + Bcolor_minus_C[1] * wB;
+                                float b = C_color[2] + Acolor_minus_C[2] * wA + Bcolor_minus_C[2] * wB;
 
-                __m128i int_v_qy = _mm_cvttps_epi32(v_qy);
-                __m128i v_py = _mm_add_epi32(int_v_qy, _mm_set1_epi32(current_y));
-                __m128i v_pixel_idx = _mm_add_epi32(_mm_mul_epi32(v_py, _mm_set1_epi32(frame_width)), _mm_set1_epi32(current_x));
+                                // Clamp the interpolated float channels to valid 0-255 bounds before casting
+                                int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f);
+                                int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f);
+                                int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f);
 
-                // Extract computed lanes back to scalar values to perform Z-buffering and texturing
-                float u_lanes[4], v_lanes[4], depth_lanes[4];
-                int py_lanes[4], pixel_idx_lanes[4];
-                _mm_storeu_ps(u_lanes, v_u);
-                _mm_storeu_ps(v_lanes, v_v);
-                _mm_storeu_ps(depth_lanes, v_depth);
-                _mm_storeu_epi32(py_lanes, v_py);
-                _mm_storeu_epi32(pixel_idx_lanes, v_pixel_idx);
-                int coverage_mask = _mm_movemask_ps(mask_coverage);
+                                Color fallback_color = {
+                                    .r = ir,
+                                    .g = ig,
+                                    .b = ib,
+                                    .a = 255
+                                };
 
+                                final_color = _color_to_uint32(fallback_color);
+                            }
 
-                // 6. SCALAR BACKEND: BLIT TO FRAMEBUFFER
-                // TODO: Check for if statements and index based array retrieval
-                for (int qy = 0; qy < 4; qy++) {
-                    // Check if this specific lane is marked valid by the SIMD edge test
-                    if (!(coverage_mask & (1 << qy))) continue;
-
-                    if (py_lanes[qy] > y_max) continue;
-                    int pixel_idx = pixel_idx_lanes[qy]; // v_py * const + const -> easily vectorized
-                    float interpolated_depth = depth_lanes[qy]; // already vectorized
-
-                    if (interpolated_depth > z_buffer[pixel_idx]) {
-                        z_buffer[pixel_idx] = interpolated_depth;
-
-                        Uint32 final_color = 0xFFFFFFFF; // const easily vectorized
-                        if (has_texture) {
-                            // Invoke your trilinear sampler pipeline cleanly
-                            Color texel = texture_sample_trilinear(texture, u_lanes[qy], v_lanes[qy], scaled_duv_dx, scaled_duv_dy);
-                            final_color = _color_to_uint32(texel); // TODO: Check for array[4] manipulation for each group value
+                            frame[pixel_idx] = final_color;
                         }
-                        else {
-                            float wA_scalar = base_wA + (qy * dA_dy); // const + (v_qy * const) -> easily vectorized
-                            float wB_scalar = base_wB + (qy * dB_dy); // const + (v_qy * const) -> easily vectorized
-                            // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
-                            float r = C_color[0] + Acolor_minus_C[0] * wA_scalar + Bcolor_minus_C[0] * wB_scalar; // easily vectorized
-                            float g = C_color[1] + Acolor_minus_C[1] * wA_scalar + Bcolor_minus_C[1] * wB_scalar; // easily vectorized
-                            float b = C_color[2] + Acolor_minus_C[2] * wA_scalar + Bcolor_minus_C[2] * wB_scalar; // easily vectorized
-
-                            // Clamp the interpolated float channels to valid 0-255 bounds before casting
-                            int ir = (Uint8)glm_clamp(r, 0.0f, 255.0f); // Clamping easily vectorized
-                            int ig = (Uint8)glm_clamp(g, 0.0f, 255.0f); // Clamping easily vectorized
-                            int ib = (Uint8)glm_clamp(b, 0.0f, 255.0f); // Clamping easily vectorized
-
-                            Color fallback_color = {
-                                .r = ir,
-                                .g = ig,
-                                .b = ib,
-                                .a = 255
-                            };
-
-                            final_color = _color_to_uint32(fallback_color);
-                        }
-
-                        frame[pixel_idx] = final_color;
                     }
                 }
                 // Step base weights down by 2 vertical lines
-                base_wA += (dA_dy * 4.0f);
-                base_wB += (dB_dy * 4.0f);
+                base_wA += (dA_dy * 2.0f);
+                base_wB += (dB_dy * 2.0f);
             }
         }
         // Step to next column
@@ -872,6 +865,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, U
         secondary_y += secondary_slope;
     }
 }
+
 
 static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
 {

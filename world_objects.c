@@ -181,9 +181,11 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     for (Uint32 i = 0; i < obj->num_triangles; i++) {
         obj->triangle_texture_indices[i] = terrain_texture_index;
     }
-    // Set fallback to green
+    // Set fallback to red
     for (Uint32 i = 0; i < total_vertices; i++) {
         obj->colors[i] = (Color){ 150, 0, 0, 255 };
+        obj->colors[i].r = obj->uvs[i][0] * 255;
+        obj->colors[i].g = obj->uvs[i][1] * 255;
     }
     return obj;
 }
