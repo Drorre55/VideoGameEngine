@@ -110,6 +110,8 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         perlin_gradients_current_octave *= 2;
     }
 
+    float multiplier = 2.;
+
     // Preperation for normalization [0, 1]
     vec2 normalize_numerator, normalize_denominator, normalized_point;
     vec2 max_bounds = { (float)(radius), (float)(radius) };
