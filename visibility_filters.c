@@ -9,15 +9,15 @@ void backface_culling(WorldObjects* world_objects, Camera* camera)
 {
 	for (Uint32 i = 0; i < world_objects->num_triangles; i++) {
 		Triangle triangle = world_objects->triangles[i];
-		vec3* vertex1 = world_objects->vertices[world_objects->triangles[i].corner1_idx];
-		vec3* vertex2 = world_objects->vertices[world_objects->triangles[i].corner2_idx];
-		vec3* vertex3 = world_objects->vertices[world_objects->triangles[i].corner3_idx];
+		vec3* position1 = world_objects->positions[world_objects->triangles[i].corner1_idx.position];
+		vec3* position2 = world_objects->positions[world_objects->triangles[i].corner2_idx.position];
+		vec3* position3 = world_objects->positions[world_objects->triangles[i].corner3_idx.position];
 
-		vec3 normal, vertex_to_camera;
-		calc_normal(vertex1, vertex2, vertex3, normal);
-		glm_vec3_sub(vertex1, camera->global_coords, vertex_to_camera);
+		vec3 normal, position_to_camera;
+		calc_normal(position1, position2, position3, normal);
+		glm_vec3_sub(position1, camera->global_coords, position_to_camera);
 
-		if (glm_vec3_dot(vertex_to_camera, normal) >= 0) {
+		if (glm_vec3_dot(position_to_camera, normal) >= 0) {
 			world_objects->triangles[i] = 
 				world_objects->triangles[world_objects->num_triangles - 1];
 			glm_vec3_copy(world_objects->normals[world_objects->num_triangles - 1], world_objects->normals[i]);
@@ -58,8 +58,8 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		{ 0.0f, -1.0f, vertical_scale, 0.0f }
 	};
 
-   // A clipped triangle can have up to 9 polygon vertices, producing 7 triangles.
-	// Output triangles use independent vertices, so each output triangle needs 3 vertices.
+   // A clipped triangle can have up to 9 polygon positions, producing 7 triangles.
+	// Output triangles use independent positions, so each output triangle needs 3 positions.
 	Uint32 maximum_triangles = camera_space_objects->num_triangles * 7;
 	Uint32 maximum_vertices = maximum_triangles * 3;
 
@@ -81,7 +81,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		return;
 	}
 
-	Uint32 vertex_count = 0;
+	Uint32 position_count = 0;
 	Uint32 triangle_count = 0;
 
 	for (Uint32 triangle_index = 0; triangle_index < camera_space_objects->num_triangles; triangle_index++) {
@@ -92,18 +92,19 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 
 		Uint32 polygon_count = 3;
 
-		Uint32 source_indices[3] = {
+		VertexIndices source_indices[3] = {
 			source_triangle.corner1_idx,
 			source_triangle.corner2_idx,
 			source_triangle.corner3_idx
 		};
 
 		for (Uint32 i = 0; i < 3; i++) {
-			Uint32 source_index = source_indices[i];
+			VertexIndices source_index = source_indices[i];
 			
-			glm_vec3_copy(camera_space_objects->vertices[source_index], polygon_a[i].vertex);
-			polygon_a[i].color = camera_space_objects->colors[source_index];
-			glm_vec2_copy(camera_space_objects->uvs[source_index], polygon_a[i].uv);
+			glm_vec3_copy(camera_space_objects->positions[source_index.position], polygon_a[i].position);
+			polygon_a[i].color = camera_space_objects->colors[source_index.color];
+			glm_vec2_copy(camera_space_objects->uvs[source_index.uv], polygon_a[i].uv);
+			glm_vec3_copy(camera_space_objects->uvs[source_index.normal], polygon_a[i].normal);
 		}	
 
 		ClipVertex* input_polygon = polygon_a;
@@ -125,7 +126,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		 
 		// Triangulate the clipped polygon
 		for (Uint32 i = 1; i + 1 < polygon_count; i++) {
-			if (vertex_count + 3 > maximum_vertices || triangle_count >= maximum_triangles) {
+			if (position_count + 3 > maximum_vertices || triangle_count >= maximum_triangles) {
 				SDL_LogError(1, "Frustum clipping output exceeded allocated capacity");
 				free(clipped_vertices);
 				free(clipped_colors);
@@ -136,17 +137,17 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 				return;
 			}
 
-			Uint32 first_index = vertex_count++;
-			Uint32 second_index = vertex_count++;
-			Uint32 third_index = vertex_count++;
+			Uint32 first_index = position_count++;
+			Uint32 second_index = position_count++;
+			Uint32 third_index = position_count++;
 
 			ClipVertex* first = &input_polygon[0];
 			ClipVertex* second = &input_polygon[i];
 			ClipVertex* third = &input_polygon[i + 1];
 
-			memcpy(clipped_vertices[first_index], first->vertex, sizeof(vec3));
-			memcpy(clipped_vertices[second_index], second->vertex, sizeof(vec3));
-			memcpy(clipped_vertices[third_index], third->vertex, sizeof(vec3));
+			memcpy(clipped_vertices[first_index], first->position, sizeof(vec3));
+			memcpy(clipped_vertices[second_index], second->position, sizeof(vec3));
+			memcpy(clipped_vertices[third_index], third->position, sizeof(vec3));
 
 			clipped_colors[first_index] = first->color;
 			clipped_colors[second_index] = second->color;
@@ -168,20 +169,20 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		}
 	}
 
-	free(camera_space_objects->vertices);
+	free(camera_space_objects->positions);
 	free(camera_space_objects->colors);
 	free(camera_space_objects->uvs);
 	free(camera_space_objects->triangles);
 	free(camera_space_objects->normals);
 	free(camera_space_objects->triangle_texture_indices);
 
-	camera_space_objects->vertices = clipped_vertices;
+	camera_space_objects->positions = clipped_vertices;
 	camera_space_objects->colors = clipped_colors;
 	camera_space_objects->uvs = clipped_uvs;
 	camera_space_objects->triangles = clipped_triangles;
 	camera_space_objects->normals = clipped_normals;
 	camera_space_objects->triangle_texture_indices = clipped_texture_indices;
-	camera_space_objects->num_vertices = vertex_count;
+	camera_space_objects->num_vertices = position_count;
 	camera_space_objects->num_triangles = triangle_count;
 }
 
@@ -199,8 +200,8 @@ static Uint32 _clip_polygon_against_plane(const ClipVertex* input, Uint32 input_
 		const ClipVertex* current = &input[i];
 		const ClipVertex* previous = &input[(i - 1 + input_count) % input_count];
 
-		float current_distance = _plane_distance(plane, current->vertex);
-		float previous_distance = _plane_distance(plane, previous->vertex);
+		float current_distance = _plane_distance(plane, current->position);
+		float previous_distance = _plane_distance(plane, previous->position);
 
 		bool current_inside = current_distance >= -epsilon;
 		bool previous_inside = previous_distance >= -epsilon;
@@ -212,7 +213,7 @@ static Uint32 _clip_polygon_against_plane(const ClipVertex* input, Uint32 input_
 			if (fabsf(denominator) > epsilon)
 				interpolation = previous_distance / denominator;
 
-			output[output_count++] = _interpolate_clip_vertex(previous, current, interpolation);
+			output[output_count++] = _interpolate_clip_position(previous, current, interpolation);
 		}
 
 		if (current_inside) {
@@ -223,21 +224,21 @@ static Uint32 _clip_polygon_against_plane(const ClipVertex* input, Uint32 input_
 	return output_count;
 }
 
-static float _plane_distance(const ClipPlane* plane, const vec3 vertex)
+static float _plane_distance(const ClipPlane* plane, const vec3 position)
 {
-	return plane->a * vertex[0] +
-		plane->b * vertex[1] +
-		plane->c * vertex[2] +
+	return plane->a * position[0] +
+		plane->b * position[1] +
+		plane->c * position[2] +
 		plane->d;
 }
 
-static ClipVertex _interpolate_clip_vertex(const ClipVertex* first, const ClipVertex* second, float interpolation)
+static ClipVertex _interpolate_clip_position(const ClipVertex* first, const ClipVertex* second, float interpolation)
 {
 	ClipVertex result;
 
-	result.vertex[0] = first->vertex[0] + (second->vertex[0] - first->vertex[0]) * interpolation;
-	result.vertex[1] = first->vertex[1] + (second->vertex[1] - first->vertex[1]) * interpolation;
-	result.vertex[2] = first->vertex[2] + (second->vertex[2] - first->vertex[2]) * interpolation;
+	result.position[0] = first->position[0] + (second->position[0] - first->position[0]) * interpolation;
+	result.position[1] = first->position[1] + (second->position[1] - first->position[1]) * interpolation;
+	result.position[2] = first->position[2] + (second->position[2] - first->position[2]) * interpolation;
 
 	result.color.r = (Uint8)(first->color.r + (second->color.r - first->color.r) * interpolation);
 	result.color.g = (Uint8)(first->color.g + (second->color.g - first->color.g) * interpolation);

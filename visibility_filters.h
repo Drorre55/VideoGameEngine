@@ -2,9 +2,10 @@
 #include "world_objects.h"
 
 typedef struct {
-	vec3 vertex;
+	vec3 position;
 	Color color;
 	vec2 uv;
+	vec3 normal;
 } ClipVertex;
 
 typedef struct {
@@ -21,5 +22,5 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera);
 void transform_FOV_space_to_01_scale(WorldObjects* world_objects);
 static Uint32 _clip_polygon_against_plane(const ClipVertex* input, Uint32 input_count,
 	ClipVertex* output, const ClipPlane* plane);
-static float _plane_distance(const ClipPlane* plane, const vec3 vertex);
-static ClipVertex _interpolate_clip_vertex(const ClipVertex* first, const ClipVertex* second, float interpolation);
+static float _plane_distance(const ClipPlane* plane, const vec3 position);
+static ClipVertex _interpolate_clip_position(const ClipVertex* first, const ClipVertex* second, float interpolation);

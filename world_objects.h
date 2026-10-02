@@ -4,17 +4,24 @@
 #include "perlin_noise.h"
 #include "texture.h"
 
+typedef struct {
+	Uint32 position;
+	Uint32 uv;
+	Uint32 color;
+	Uint32 normal;
+} VertexIndices;
+
 typedef union {
 	struct {
-		Uint32 corner1_idx;
-		Uint32 corner2_idx;
-		Uint32 corner3_idx;
+		VertexIndices corner1_idx;
+		VertexIndices corner2_idx;
+		VertexIndices corner3_idx;
 	};
-	Uint32 iter[3];
+	VertexIndices iter[3];
 } Triangle;
 
 typedef struct {
-	vec3* vertices;
+	vec3* positions;
 	Triangle* triangles;
 	Color* colors;
 	vec2* uvs;

@@ -27,11 +27,11 @@ WorldObjects* load_obj_file(const char* filepath)
     }
     obj->num_triangles = total_triangles;
 
-    // Each triangle now gets its OWN 3 vertices (no sharing),
+    // Each triangle now gets its OWN 3 positions (no sharing),
     // so flat per-face color doesn't bleed into neighboring faces.
     obj->num_vertices = total_triangles * 3;
-    obj->vertices = malloc(sizeof(vec3) * obj->num_vertices);
-    if (!obj->vertices) {
+    obj->positions = malloc(sizeof(vec3) * obj->num_vertices);
+    if (!obj->positions) {
         SDL_LogError(1, "Error: Failed to generate ground mesh");
         free(obj);
         fast_obj_destroy(mesh);
@@ -40,7 +40,7 @@ WorldObjects* load_obj_file(const char* filepath)
     obj->colors = malloc(sizeof(Color) * obj->num_vertices);
     if (!obj->colors) {
         SDL_LogError(1, "Error: Failed to generate ground mesh");
-        free(obj->vertices);
+        free(obj->positions);
         free(obj);
         fast_obj_destroy(mesh);
         return NULL;
@@ -49,7 +49,7 @@ WorldObjects* load_obj_file(const char* filepath)
     if (!obj->uvs) {
         SDL_LogError(1, "Error: Failed to allocate UVs for '%s'", filepath);
         free(obj->colors);
-        free(obj->vertices);
+        free(obj->positions);
         free(obj);
         fast_obj_destroy(mesh);
         return NULL;
@@ -59,18 +59,18 @@ WorldObjects* load_obj_file(const char* filepath)
         SDL_LogError(1, "Error: Failed to generate ground mesh");
         free(obj->uvs);
         free(obj->colors);
-        free(obj->vertices);
+        free(obj->positions);
         free(obj);
         fast_obj_destroy(mesh);
         return NULL;
     }
-    obj->normals = malloc(sizeof(vec3) * obj->num_triangles);
+    obj->normals = malloc(sizeof(vec3) * obj->num_vertices);
     if (!obj->normals) {
         SDL_LogError(1, "Error: Failed to allocate triangle textures for '%s'", filepath);
         free(obj->triangles);
         free(obj->uvs);
         free(obj->colors);
-        free(obj->vertices);
+        free(obj->positions);
         free(obj);
         fast_obj_destroy(mesh);
         return NULL;
@@ -82,7 +82,7 @@ WorldObjects* load_obj_file(const char* filepath)
         free(obj->triangles);
         free(obj->uvs);
         free(obj->colors);
-        free(obj->vertices);
+        free(obj->positions);
         free(obj);
         fast_obj_destroy(mesh);
         return NULL;
@@ -106,52 +106,75 @@ WorldObjects* load_obj_file(const char* filepath)
 
         for (unsigned int v = 1; v < face_verts - 1; v++) {
             // Source positions from fast_obj (still 1-based, dummy 0 index)
-            Uint32 src0 = mesh->indices[index_cursor].p;
-            Uint32 src1 = mesh->indices[index_cursor + v].p;
-            Uint32 src2 = mesh->indices[index_cursor + v + 1].p;
+            Uint32 pos0 = mesh->indices[index_cursor].p;
+            Uint32 pos1 = mesh->indices[index_cursor + v].p;
+            Uint32 pos2 = mesh->indices[index_cursor + v + 1].p;
 
             Uint32 tex0 = mesh->indices[index_cursor].t;
             Uint32 tex1 = mesh->indices[index_cursor + v].t;
             Uint32 tex2 = mesh->indices[index_cursor + v + 1].t;
 
-            vec3 p0, p1, p2;
-            p0[0] = mesh->positions[src0 * 3 + 0];
-            p0[1] = mesh->positions[src0 * 3 + 1];
-            p0[2] = mesh->positions[src0 * 3 + 2];
-            p1[0] = mesh->positions[src1 * 3 + 0];
-            p1[1] = mesh->positions[src1 * 3 + 1];
-            p1[2] = mesh->positions[src1 * 3 + 2];
-            p2[0] = mesh->positions[src2 * 3 + 0];
-            p2[1] = mesh->positions[src2 * 3 + 1];
-            p2[2] = mesh->positions[src2 * 3 + 2];
+            Uint32 norm0 = mesh->indices[index_cursor].n;
+            Uint32 norm1 = mesh->indices[index_cursor + v].n;
+            Uint32 norm2 = mesh->indices[index_cursor + v + 1].n;
 
-            // Write 3 fresh vertices for this triangle
+            vec3 p0, p1, p2;
+            p0[0] = mesh->positions[pos0 * 3 + 0];
+            p0[1] = mesh->positions[pos0 * 3 + 1];
+            p0[2] = mesh->positions[pos0 * 3 + 2];
+            p1[0] = mesh->positions[pos1 * 3 + 0];
+            p1[1] = mesh->positions[pos1 * 3 + 1];
+            p1[2] = mesh->positions[pos1 * 3 + 2];
+            p2[0] = mesh->positions[pos2 * 3 + 0];
+            p2[1] = mesh->positions[pos2 * 3 + 1];
+            p2[2] = mesh->positions[pos2 * 3 + 2];
+
+            // Write 3 fresh positions for this triangle
             Uint32 i0 = vert_cursor++;
             Uint32 i1 = vert_cursor++;
             Uint32 i2 = vert_cursor++;
 
-            glm_vec3_copy(p0, obj->vertices[i0]);
-            glm_vec3_copy(p1, obj->vertices[i1]);
-            glm_vec3_copy(p2, obj->vertices[i2]);
+            glm_vec3_copy(p0, obj->positions[i0]);
+            glm_vec3_copy(p1, obj->positions[i1]);
+            glm_vec3_copy(p2, obj->positions[i2]);
 
             if (mesh->texcoords && tex0 != 0 && tex1 != 0 && tex2 != 0) {
                 obj->uvs[i0][0] = mesh->texcoords[(tex0 * 2) + 0];
                 obj->uvs[i0][1] = mesh->texcoords[(tex0 * 2) + 1];
+                obj->triangles[tri_cursor].corner1_idx.uv = i0;
                 obj->uvs[i1][0] = mesh->texcoords[(tex1 * 2) + 0];
                 obj->uvs[i1][1] = mesh->texcoords[(tex1 * 2) + 1];
+                obj->triangles[tri_cursor].corner2_idx.uv = i1;
                 obj->uvs[i2][0] = mesh->texcoords[(tex2 * 2) + 0];
                 obj->uvs[i2][1] = mesh->texcoords[(tex2 * 2) + 1];
+                obj->triangles[tri_cursor].corner3_idx.uv = i2;
             }
-
+            if (mesh->normals && norm0 != 0 && norm1 != 0 && norm2 != 0) {
+                obj->normals[i0][0] = mesh->normals[(norm0 * 3) + 0];
+                obj->normals[i0][1] = mesh->normals[(norm0 * 3) + 1];
+                obj->normals[i0][2] = mesh->normals[(norm0 * 3) + 2];
+                obj->triangles[tri_cursor].corner1_idx.normal = i0;
+                obj->normals[i1][0] = mesh->normals[(norm1 * 3) + 0];
+                obj->normals[i1][1] = mesh->normals[(norm1 * 3) + 1];
+                obj->normals[i1][2] = mesh->normals[(norm1 * 3) + 2];
+                obj->triangles[tri_cursor].corner2_idx.normal = i1;
+                obj->normals[i2][0] = mesh->normals[(norm2 * 3) + 0];
+                obj->normals[i2][1] = mesh->normals[(norm2 * 3) + 1];
+                obj->normals[i2][2] = mesh->normals[(norm2 * 3) + 2];
+                obj->triangles[tri_cursor].corner3_idx.normal = i2;
+            }
             // Temp until import actual colors or texture from file 
             Color c = _face_color_from_normal(p0, p1, p2);
             memcpy(&(obj->colors[i0]), &c, sizeof(Color));
+            obj->triangles[tri_cursor].corner1_idx.color = i0;
             memcpy(&(obj->colors[i1]), &c, sizeof(Color));
+            obj->triangles[tri_cursor].corner2_idx.color = i1;
             memcpy(&(obj->colors[i2]), &c, sizeof(Color));
+            obj->triangles[tri_cursor].corner3_idx.color = i2;
 
-            obj->triangles[tri_cursor].corner1_idx = i0;
-            obj->triangles[tri_cursor].corner2_idx = i1;
-            obj->triangles[tri_cursor].corner3_idx = i2;
+            obj->triangles[tri_cursor].corner1_idx.position = i0;
+            obj->triangles[tri_cursor].corner2_idx.position = i1;
+            obj->triangles[tri_cursor].corner3_idx.position = i2;
 
             tri_cursor++;
         }

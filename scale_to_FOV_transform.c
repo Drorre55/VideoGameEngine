@@ -6,24 +6,24 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
 	float vertical_scale = tanf(camera->field_of_view->y_degree_from_center);
 
 	for (Uint32 i = 0; i < world_objects->num_vertices; i++) {
-		vec3* vertex = world_objects->vertices[i];
+		vec3* position = world_objects->positions[i];
 
-		float vertex_z = (*vertex)[2];
+		float position_z = (*position)[2];
 
-		(*vertex)[0] /= horizontal_scale * vertex_z;
-		(*vertex)[1] /= vertical_scale * vertex_z;
+		(*position)[0] /= horizontal_scale * position_z;
+		(*position)[1] /= vertical_scale * position_z;
 		// inverse z -> small_value = far, big_value = close
-		(*vertex)[2] = 1.f / vertex_z; //(vertex_z - VIEW_FRUSTUM_MIN) / (VIEW_FRUSTUM_MAX - VIEW_FRUSTUM_MIN);
+		(*position)[2] = 1.f / position_z; //(position_z - VIEW_FRUSTUM_MIN) / (VIEW_FRUSTUM_MAX - VIEW_FRUSTUM_MIN);
 
-		world_objects->uvs[i][0] /= vertex_z;
-		world_objects->uvs[i][1] /= vertex_z;
+		world_objects->uvs[i][0] /= position_z;
+		world_objects->uvs[i][1] /= position_z;
 	}
 }
 
 void transform_FOV_space_to_01_scale(WorldObjects* world_objects) {
 	for (int i = 0; i < world_objects->num_vertices; i++) {
-		vec3* vertex = world_objects->vertices[i];
-		(*vertex)[0] = ((*vertex)[0] + 1) / 2;
-		(*vertex)[1] = ((*vertex)[1] + 1) / 2;
+		vec3* position = world_objects->positions[i];
+		(*position)[0] = ((*position)[0] + 1) / 2;
+		(*position)[1] = ((*position)[1] + 1) / 2;
 	}
 }
