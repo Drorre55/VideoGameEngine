@@ -295,7 +295,7 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
 #include <stdint.h>
 #include <stdio.h>
 
-// Struct tracking standard 2D screen space vertices with attributes passed from vertex shader
+// Struct tracking standard 2D screen space positions with attributes passed from position shader
 typedef struct {
     float x, y, z;
     float u, v;
@@ -317,16 +317,16 @@ inline float fmax3(float a, float b, float c) {
 // --- TRIANGLE RASTERIZATION TRAVERSAL LOOP ---
 void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame_buffer, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
-    vec3* vertices = world_objects->vertices;
+    vec3* positions = world_objects->positions;
     Color* colors = world_objects->colors;
     vec2* uvs = world_objects->uvs;
 
     Triangle triangle = world_objects->triangles[triangle_index];
 
     Vertex v0 = {
-        .x = vertices[triangle.corner1_idx][0],
-        .y = vertices[triangle.corner1_idx][1],
-        .z = vertices[triangle.corner1_idx][2],
+        .x = positions[triangle.corner1_idx][0],
+        .y = positions[triangle.corner1_idx][1],
+        .z = positions[triangle.corner1_idx][2],
         .u = uvs[triangle.corner1_idx][0],
         .v = uvs[triangle.corner1_idx][1],
         .r = (float)colors[triangle.corner1_idx].r,
@@ -335,9 +335,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         .a = (float)colors[triangle.corner1_idx].a,
     };
     Vertex v1 = {
-        .x = vertices[triangle.corner2_idx][0],
-        .y = vertices[triangle.corner2_idx][1],
-        .z = vertices[triangle.corner2_idx][2],
+        .x = positions[triangle.corner2_idx][0],
+        .y = positions[triangle.corner2_idx][1],
+        .z = positions[triangle.corner2_idx][2],
         .u = uvs[triangle.corner2_idx][0],
         .v = uvs[triangle.corner2_idx][1],
         .r = (float)colors[triangle.corner2_idx].r,
@@ -346,9 +346,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         .a = (float)colors[triangle.corner2_idx].a,
     };
     Vertex v2 = {
-        .x = vertices[triangle.corner3_idx][0],
-        .y = vertices[triangle.corner3_idx][1],
-        .z = vertices[triangle.corner3_idx][2],
+        .x = positions[triangle.corner3_idx][0],
+        .y = positions[triangle.corner3_idx][1],
+        .z = positions[triangle.corner3_idx][2],
         .u = uvs[triangle.corner3_idx][0],
         .v = uvs[triangle.corner3_idx][1],
         .r = (float)colors[triangle.corner3_idx].r,
@@ -450,7 +450,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
     __m256 vdg_dx = _mm256_set1_ps(dg_dx); __m256 vdg_dy = _mm256_set1_ps(dg_dy);
     __m256 vdb_dx = _mm256_set1_ps(db_dx); __m256 vdb_dy = _mm256_set1_ps(db_dy);
 
-    // Top-left evaluation coordinates tracking anchor vertex v0
+    // Top-left evaluation coordinates tracking anchor position v0
     __m256 vv0_x = _mm256_set1_ps(v0.x);  __m256 vv0_y = _mm256_set1_ps(v0.y);
 
     // =========================================================================
@@ -493,7 +493,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
                 continue;
             }
 
-            // Calculate distance deltas from the baseline anchor vertex v0
+            // Calculate distance deltas from the baseline anchor position v0
             __m256 dx = _mm256_sub_ps(px, vv0_x);
 
             // 4. Parallel FMA Attribute Interpolation
@@ -535,7 +535,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
                     __m256 final_G = _mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy)));
                     __m256 final_B = _mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy)));
                     __m256 final_A = _mm256_set1_ps(v0.a);
-                    // Assuming constant vertex alpha for solid shading
+                    // Assuming constant position alpha for solid shading
                     // Clamp float colors straight to [0.0f, 255.0f] range
                     __m256 max_color = _mm256_set1_ps(255.0f);
                     final_R = _mm256_min_ps(_mm256_max_ps(final_R, _mm256_setzero_ps()), max_color);
@@ -579,9 +579,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
 void transform_to_pixel_space(WorldObjects* on_screen_objects, Uint32 frame_width, Uint32 frame_height)
 {
 	for (int i = 0; i < on_screen_objects->num_vertices; i++) {
-		vec3* vertex = on_screen_objects->vertices[i];
-		(*vertex)[0] = (*vertex)[0] * frame_width;
-		(*vertex)[1] = (*vertex)[1] * frame_height;
+		vec3* position = on_screen_objects->positions[i];
+		(*position)[0] = (*position)[0] * frame_width;
+		(*position)[1] = (*position)[1] * frame_height;
 	}
 }
 
@@ -620,17 +620,18 @@ inline float horizontal_average_m128(__m128 v) {
 
 static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, vec3 light_direction, Uint32* frame, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
-    vec3* vertices = world_objects->vertices;
+    vec3* positions = world_objects->positions;
     Color* colors = world_objects->colors;
     vec2* uvs = world_objects->uvs;
+    vec3* normals = world_objects->normals;
 
     Triangle triangle = world_objects->triangles[triangle_index];
     Triangle sorted_triangle;
-    _sort_points_by_x(&triangle, &sorted_triangle, vertices);
+    _sort_points_by_x(&triangle, &sorted_triangle, positions);
 
-    vec3* A = vertices[sorted_triangle.corner1_idx];
-    vec3* B = vertices[sorted_triangle.corner2_idx];
-    vec3* C = vertices[sorted_triangle.corner3_idx];
+    vec3* A = positions[sorted_triangle.corner1_idx];
+    vec3* B = positions[sorted_triangle.corner2_idx];
+    vec3* C = positions[sorted_triangle.corner3_idx];
     vec4 A_color = { (float)colors[sorted_triangle.corner1_idx].r, (float)colors[sorted_triangle.corner1_idx].g,
         (float)colors[sorted_triangle.corner1_idx].b, (float)colors[sorted_triangle.corner1_idx].a };
     vec4 B_color = { (float)colors[sorted_triangle.corner2_idx].r, (float)colors[sorted_triangle.corner2_idx].g,
@@ -640,9 +641,9 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     vec2* A_uv = uvs[sorted_triangle.corner1_idx];
     vec2* B_uv = uvs[sorted_triangle.corner2_idx];
     vec2* C_uv = uvs[sorted_triangle.corner3_idx];
-
-    vec3 normal;
-    glm_vec3_copy(world_objects->normals[triangle_index], normal);
+    vec3* A_normal = normals[sorted_triangle.corner1_idx];
+    vec3* B_normal = normals[sorted_triangle.corner2_idx];
+    vec3* C_normal = normals[sorted_triangle.corner3_idx];
 
     // Copy corner data to local variables for faster access
     float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
@@ -697,6 +698,10 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     _calc_step_constants(A_color, B_color, C_color, 4, dA_dx, dA_dy, dB_dx, dB_dy, Acolor_minus_C,
         Bcolor_minus_C, dcolor_dx, dcolor_dy);
 
+    vec3 Anormal_minus_C, Bnormal_minus_C, dnormal_dx, dnormal_dy;
+    _calc_step_constants(A_normal, B_normal, C_normal, 3, dA_dx, dA_dy, dB_dx, dB_dy, Anormal_minus_C,
+        Bnormal_minus_C, dnormal_dx, dnormal_dy);
+
     const int has_texture =
         world_objects->triangle_texture_indices &&
         triangle_index < world_objects->num_triangles &&
@@ -714,7 +719,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
      * ----------------------------------------------------------------
      * Edge setup
      *
-     * Since vertices are sorted:
+     * Since positions are sorted:
      *
      * A.x <= B.x <= C.x
      *
@@ -819,7 +824,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
                             z_buffer[pixel_idx] = interpolated_depth;
 
                             Color final_color = { .r = 0, .g = 0, .r = 0, .a = 255 };
-                            if (has_texture && 0) {
+                            if (has_texture) {
                                 float z = 1.0f / interpolated_depth;
 
                                 float u = ((*C_uv)[0] + Auv_minus_C[0] * wA + Buv_minus_C[0] * wB) * z;
@@ -850,12 +855,17 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
                                     .a = 255
                                 };
                             }
-                            float lighting = glm_vec3_dot(light_direction, normal);
-                            lighting = lighting > 0. ? 0. : lighting;
-                            lighting = fabsf(lighting);
-                            final_color.r = (Uint8)(fabsf(normal[0]) * 255. * lighting);//(Uint8)((float)(final_color.r) * lighting);
-                            final_color.g = (Uint8)(fabsf(normal[1]) * 255. * lighting);//(Uint8)((float)(final_color.g) * lighting);
-                            final_color.b = (Uint8)(fabsf(normal[2]) * 255. * lighting);//(Uint8)((float)(final_color.b) * lighting);
+                            vec3 pixel_normal;
+                            pixel_normal[0] = (*C_normal)[0] + Anormal_minus_C[0] * wA + Bnormal_minus_C[0] * wB;
+                            pixel_normal[1] = (*C_normal)[1] + Anormal_minus_C[1] * wA + Bnormal_minus_C[1] * wB;
+                            pixel_normal[2] = (*C_normal)[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
+
+                            glm_vec3_normalize(pixel_normal);
+                            float lighting = glm_clamp_zo(glm_vec3_dot(light_direction, pixel_normal));
+                            final_color.g = (Uint8)((float)final_color.g * lighting);
+                            final_color.b = (Uint8)((float)final_color.b * lighting);
+                            final_color.r = (Uint8)((float)final_color.r * lighting);
+
                             frame[pixel_idx] = _color_to_uint32(final_color);
                         }
                     }
@@ -872,15 +882,15 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
 }
 
 
-static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices)
+static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* positions)
 {
-	vec3* vertex_a = vertices[triangle->corner1_idx];
-	vec3* vertex_b = vertices[triangle->corner2_idx];
-	vec3* vertex_c = vertices[triangle->corner3_idx];
+	vec3* position_a = positions[triangle->corner1_idx];
+	vec3* position_b = positions[triangle->corner2_idx];
+	vec3* position_c = positions[triangle->corner3_idx];
 
-	if ((*vertex_a)[0] <= (*vertex_b)[0] && (*vertex_a)[0] <= (*vertex_c)[0]) {
+	if ((*position_a)[0] <= (*position_b)[0] && (*position_a)[0] <= (*position_c)[0]) {
 		dest->corner1_idx = triangle->corner1_idx;
-		if ((*vertex_b)[0] <= (*vertex_c)[0]) {
+		if ((*position_b)[0] <= (*position_c)[0]) {
 			dest->corner2_idx = triangle->corner2_idx;
 			dest->corner3_idx = triangle->corner3_idx;
 		}
@@ -889,9 +899,9 @@ static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices
 			dest->corner3_idx = triangle->corner2_idx;
 		}
 	}
-	else if ((*vertex_b)[0] <= (*vertex_a)[0] && (*vertex_b)[0] <= (*vertex_c)[0]) {
+	else if ((*position_b)[0] <= (*position_a)[0] && (*position_b)[0] <= (*position_c)[0]) {
 		dest->corner1_idx = triangle->corner2_idx;
-		if ((*vertex_a)[0] <= (*vertex_c)[0]) {
+		if ((*position_a)[0] <= (*position_c)[0]) {
 			dest->corner2_idx = triangle->corner1_idx;
 			dest->corner3_idx = triangle->corner3_idx;
 		}
@@ -902,7 +912,7 @@ static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* vertices
 	}
 	else {
 		dest->corner1_idx = triangle->corner3_idx;
-		if ((*vertex_a)[0] <= (*vertex_b)[0]) {
+		if ((*position_a)[0] <= (*position_b)[0]) {
 			dest->corner2_idx = triangle->corner1_idx;
 			dest->corner3_idx = triangle->corner2_idx;
 		}

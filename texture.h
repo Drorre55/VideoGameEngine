@@ -45,7 +45,7 @@ Uint32 texture_bank_add(TextureBank* bank, TiledTexture mipmaps);
 Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath);
 
 Color texture_sample_nearest(const Mipmap mipmap, float u, float v);
-Color texture_sample_bilinear(const Mipmap mipmap, float u, float v);
+static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float v);
 Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy);
 
 Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value);
