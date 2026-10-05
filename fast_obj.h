@@ -139,7 +139,7 @@ typedef struct
     unsigned int*               face_materials;
     unsigned char*              face_lines;
 
-    /* Index data: one element for each face position */
+    /* Index data: one element for each face vertex */
     unsigned int                index_count;
     fastObjIndex*               indices;
 
@@ -667,7 +667,7 @@ const char* parse_float(const char* ptr, float* val)
 
 
 static
-const char* parse_position(fastObjData* data, const char* ptr)
+const char* parse_vertex(fastObjData* data, const char* ptr)
 {
     unsigned int ii;
     float        v;
@@ -772,7 +772,7 @@ const char* parse_face(fastObjData* data, const char* ptr, unsigned char line)
         else if (v > 0)
             vn.p = (fastObjUInt)(v);
         else
-            return ptr; /* Skip lines with no valid position index */
+            return ptr; /* Skip lines with no valid vertex index */
 
         if (t < 0)
             vn.t = (array_size(data->mesh->texcoords) / 2) - (fastObjUInt)(-t);
@@ -1283,7 +1283,7 @@ void parse_buffer(fastObjData* data, const char* ptr, const char* end, const fas
             {
             case ' ':
             case '\t':
-                p = parse_position(data, p);
+                p = parse_vertex(data, p);
                 break;
 
             case 't':

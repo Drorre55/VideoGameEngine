@@ -9,9 +9,9 @@ void backface_culling(WorldObjects* world_objects, Camera* camera)
 {
 	for (Uint32 i = 0; i < world_objects->num_triangles; i++) {
 		Triangle triangle = world_objects->triangles[i];
-		vec3* position1 = world_objects->positions[world_objects->triangles[i].corner1_idx.position];
-		vec3* position2 = world_objects->positions[world_objects->triangles[i].corner2_idx.position];
-		vec3* position3 = world_objects->positions[world_objects->triangles[i].corner3_idx.position];
+		vec3* position1 = world_objects->positions[world_objects->triangles[i].corner1_idx];
+		vec3* position2 = world_objects->positions[world_objects->triangles[i].corner2_idx];
+		vec3* position3 = world_objects->positions[world_objects->triangles[i].corner3_idx];
 
 		vec3 normal, position_to_camera;
 		calc_normal(position1, position2, position3, normal);
@@ -92,19 +92,19 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 
 		Uint32 polygon_count = 3;
 
-		VertexIndices source_indices[3] = {
+		Uint32 source_indices[3] = {
 			source_triangle.corner1_idx,
 			source_triangle.corner2_idx,
 			source_triangle.corner3_idx
 		};
 
 		for (Uint32 i = 0; i < 3; i++) {
-			VertexIndices source_index = source_indices[i];
+			Uint32 source_index = source_indices[i];
 			
-			glm_vec3_copy(camera_space_objects->positions[source_index.position], polygon_a[i].position);
-			polygon_a[i].color = camera_space_objects->colors[source_index.color];
-			glm_vec2_copy(camera_space_objects->uvs[source_index.uv], polygon_a[i].uv);
-			glm_vec3_copy(camera_space_objects->uvs[source_index.normal], polygon_a[i].normal);
+			glm_vec3_copy(camera_space_objects->positions[source_index], polygon_a[i].position);
+			polygon_a[i].color = camera_space_objects->colors[source_index];
+			glm_vec2_copy(camera_space_objects->uvs[source_index], polygon_a[i].uv);
+			glm_vec3_copy(camera_space_objects->uvs[source_index], polygon_a[i].normal);
 		}	
 
 		ClipVertex* input_polygon = polygon_a;

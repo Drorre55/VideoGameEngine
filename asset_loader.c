@@ -141,40 +141,39 @@ WorldObjects* load_obj_file(const char* filepath)
             if (mesh->texcoords && tex0 != 0 && tex1 != 0 && tex2 != 0) {
                 obj->uvs[i0][0] = mesh->texcoords[(tex0 * 2) + 0];
                 obj->uvs[i0][1] = mesh->texcoords[(tex0 * 2) + 1];
-                obj->triangles[tri_cursor].corner1_idx.uv = i0;
                 obj->uvs[i1][0] = mesh->texcoords[(tex1 * 2) + 0];
                 obj->uvs[i1][1] = mesh->texcoords[(tex1 * 2) + 1];
-                obj->triangles[tri_cursor].corner2_idx.uv = i1;
                 obj->uvs[i2][0] = mesh->texcoords[(tex2 * 2) + 0];
                 obj->uvs[i2][1] = mesh->texcoords[(tex2 * 2) + 1];
-                obj->triangles[tri_cursor].corner3_idx.uv = i2;
             }
+
             if (mesh->normals && norm0 != 0 && norm1 != 0 && norm2 != 0) {
                 obj->normals[i0][0] = mesh->normals[(norm0 * 3) + 0];
                 obj->normals[i0][1] = mesh->normals[(norm0 * 3) + 1];
                 obj->normals[i0][2] = mesh->normals[(norm0 * 3) + 2];
-                obj->triangles[tri_cursor].corner1_idx.normal = i0;
                 obj->normals[i1][0] = mesh->normals[(norm1 * 3) + 0];
                 obj->normals[i1][1] = mesh->normals[(norm1 * 3) + 1];
                 obj->normals[i1][2] = mesh->normals[(norm1 * 3) + 2];
-                obj->triangles[tri_cursor].corner2_idx.normal = i1;
                 obj->normals[i2][0] = mesh->normals[(norm2 * 3) + 0];
                 obj->normals[i2][1] = mesh->normals[(norm2 * 3) + 1];
                 obj->normals[i2][2] = mesh->normals[(norm2 * 3) + 2];
-                obj->triangles[tri_cursor].corner3_idx.normal = i2;
+            }
+            else {
+                vec3 face_normal;
+                calc_normal(p0, p1, p2, face_normal);
+                glm_vec3_copy(face_normal, obj->normals[i0]);
+                glm_vec3_copy(face_normal, obj->normals[i1]);
+                glm_vec3_copy(face_normal, obj->normals[i2]);
             }
             // Temp until import actual colors or texture from file 
             Color c = _face_color_from_normal(p0, p1, p2);
             memcpy(&(obj->colors[i0]), &c, sizeof(Color));
-            obj->triangles[tri_cursor].corner1_idx.color = i0;
             memcpy(&(obj->colors[i1]), &c, sizeof(Color));
-            obj->triangles[tri_cursor].corner2_idx.color = i1;
             memcpy(&(obj->colors[i2]), &c, sizeof(Color));
-            obj->triangles[tri_cursor].corner3_idx.color = i2;
 
-            obj->triangles[tri_cursor].corner1_idx.position = i0;
-            obj->triangles[tri_cursor].corner2_idx.position = i1;
-            obj->triangles[tri_cursor].corner3_idx.position = i2;
+            obj->triangles[tri_cursor].corner1_idx = i0;
+            obj->triangles[tri_cursor].corner2_idx = i1;
+            obj->triangles[tri_cursor].corner3_idx = i2;
 
             tri_cursor++;
         }

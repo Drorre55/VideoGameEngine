@@ -324,37 +324,37 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
     Triangle triangle = world_objects->triangles[triangle_index];
 
     Vertex v0 = {
-        .x = positions[triangle.corner1_idx.position][0],
-        .y = positions[triangle.corner1_idx.position][1],
-        .z = positions[triangle.corner1_idx.position][2],
-        .u = uvs[triangle.corner1_idx.uv][0],
-        .v = uvs[triangle.corner1_idx.uv][1],
-        .r = (float)colors[triangle.corner1_idx.color].r,
-        .g = (float)colors[triangle.corner1_idx.color].g,
-        .b = (float)colors[triangle.corner1_idx.color].b,
-        .a = (float)colors[triangle.corner1_idx.color].a,
+        .x = positions[triangle.corner1_idx][0],
+        .y = positions[triangle.corner1_idx][1],
+        .z = positions[triangle.corner1_idx][2],
+        .u = uvs[triangle.corner1_idx][0],
+        .v = uvs[triangle.corner1_idx][1],
+        .r = (float)colors[triangle.corner1_idx].r,
+        .g = (float)colors[triangle.corner1_idx].g,
+        .b = (float)colors[triangle.corner1_idx].b,
+        .a = (float)colors[triangle.corner1_idx].a,
     };
     Vertex v1 = {
-        .x = positions[triangle.corner2_idx.position][0],
-        .y = positions[triangle.corner2_idx.position][1],
-        .z = positions[triangle.corner2_idx.position][2],
-        .u = uvs[triangle.corner2_idx.uv][0],
-        .v = uvs[triangle.corner2_idx.uv][1],
-        .r = (float)colors[triangle.corner2_idx.color].r,
-        .g = (float)colors[triangle.corner2_idx.color].g,
-        .b = (float)colors[triangle.corner2_idx.color].b,
-        .a = (float)colors[triangle.corner2_idx.color].a,
+        .x = positions[triangle.corner2_idx][0],
+        .y = positions[triangle.corner2_idx][1],
+        .z = positions[triangle.corner2_idx][2],
+        .u = uvs[triangle.corner2_idx][0],
+        .v = uvs[triangle.corner2_idx][1],
+        .r = (float)colors[triangle.corner2_idx].r,
+        .g = (float)colors[triangle.corner2_idx].g,
+        .b = (float)colors[triangle.corner2_idx].b,
+        .a = (float)colors[triangle.corner2_idx].a,
     };
     Vertex v2 = {
-        .x = positions[triangle.corner3_idx.position][0],
-        .y = positions[triangle.corner3_idx.position][1],
-        .z = positions[triangle.corner3_idx.position][2],
-        .u = uvs[triangle.corner3_idx.uv][0],
-        .v = uvs[triangle.corner3_idx.uv][1],
-        .r = (float)colors[triangle.corner3_idx.color].r,
-        .g = (float)colors[triangle.corner3_idx.color].g,
-        .b = (float)colors[triangle.corner3_idx.color].b,
-        .a = (float)colors[triangle.corner3_idx.color].a,
+        .x = positions[triangle.corner3_idx][0],
+        .y = positions[triangle.corner3_idx][1],
+        .z = positions[triangle.corner3_idx][2],
+        .u = uvs[triangle.corner3_idx][0],
+        .v = uvs[triangle.corner3_idx][1],
+        .r = (float)colors[triangle.corner3_idx].r,
+        .g = (float)colors[triangle.corner3_idx].g,
+        .b = (float)colors[triangle.corner3_idx].b,
+        .a = (float)colors[triangle.corner3_idx].a,
     };
 
     const int has_texture =
@@ -629,21 +629,21 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     Triangle sorted_triangle;
     _sort_points_by_x(&triangle, &sorted_triangle, positions);
 
-    vec3* A = positions[sorted_triangle.corner1_idx.position];
-    vec3* B = positions[sorted_triangle.corner2_idx.position];
-    vec3* C = positions[sorted_triangle.corner3_idx.position];
-    vec4 A_color = { (float)colors[sorted_triangle.corner1_idx.color].r, (float)colors[sorted_triangle.corner1_idx.color].g,
-        (float)colors[sorted_triangle.corner1_idx.color].b, (float)colors[sorted_triangle.corner1_idx.color].a };
-    vec4 B_color = { (float)colors[sorted_triangle.corner2_idx.color].r, (float)colors[sorted_triangle.corner2_idx.color].g,
-        (float)colors[sorted_triangle.corner2_idx.color].b, (float)colors[sorted_triangle.corner2_idx.color].a };
-    vec4 C_color = { (float)colors[sorted_triangle.corner3_idx.color].r, (float)colors[sorted_triangle.corner3_idx.color].g,
-        (float)colors[sorted_triangle.corner3_idx.color].b, (float)colors[sorted_triangle.corner3_idx.color].a };
-    vec2* A_uv = uvs[sorted_triangle.corner1_idx.uv];
-    vec2* B_uv = uvs[sorted_triangle.corner2_idx.uv];
-    vec2* C_uv = uvs[sorted_triangle.corner3_idx.uv];
-    vec2* A_normal = normals[sorted_triangle.corner1_idx.normal];
-    vec2* B_normal = normals[sorted_triangle.corner2_idx.normal];
-    vec2* C_normal = normals[sorted_triangle.corner3_idx.normal];
+    vec3* A = positions[sorted_triangle.corner1_idx];
+    vec3* B = positions[sorted_triangle.corner2_idx];
+    vec3* C = positions[sorted_triangle.corner3_idx];
+    vec4 A_color = { (float)colors[sorted_triangle.corner1_idx].r, (float)colors[sorted_triangle.corner1_idx].g,
+        (float)colors[sorted_triangle.corner1_idx].b, (float)colors[sorted_triangle.corner1_idx].a };
+    vec4 B_color = { (float)colors[sorted_triangle.corner2_idx].r, (float)colors[sorted_triangle.corner2_idx].g,
+        (float)colors[sorted_triangle.corner2_idx].b, (float)colors[sorted_triangle.corner2_idx].a };
+    vec4 C_color = { (float)colors[sorted_triangle.corner3_idx].r, (float)colors[sorted_triangle.corner3_idx].g,
+        (float)colors[sorted_triangle.corner3_idx].b, (float)colors[sorted_triangle.corner3_idx].a };
+    vec2* A_uv = uvs[sorted_triangle.corner1_idx];
+    vec2* B_uv = uvs[sorted_triangle.corner2_idx];
+    vec2* C_uv = uvs[sorted_triangle.corner3_idx];
+    vec2* A_normal = normals[sorted_triangle.corner1_idx];
+    vec2* B_normal = normals[sorted_triangle.corner2_idx];
+    vec2* C_normal = normals[sorted_triangle.corner3_idx];
 
     vec3 normal;
     glm_vec3_copy(world_objects->normals[triangle_index], normal);
@@ -893,9 +893,9 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
 
 static void _sort_points_by_x(Triangle* triangle, Triangle* dest, vec3* positions)
 {
-	vec3* position_a = positions[triangle->corner1_idx.position];
-	vec3* position_b = positions[triangle->corner2_idx.position];
-	vec3* position_c = positions[triangle->corner3_idx.position];
+	vec3* position_a = positions[triangle->corner1_idx];
+	vec3* position_b = positions[triangle->corner2_idx];
+	vec3* position_c = positions[triangle->corner3_idx];
 
 	if ((*position_a)[0] <= (*position_b)[0] && (*position_a)[0] <= (*position_c)[0]) {
 		dest->corner1_idx = triangle->corner1_idx;
