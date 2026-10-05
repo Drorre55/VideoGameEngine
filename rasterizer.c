@@ -645,9 +645,6 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     vec2* B_normal = normals[sorted_triangle.corner2_idx];
     vec2* C_normal = normals[sorted_triangle.corner3_idx];
 
-    vec3 normal;
-    glm_vec3_copy(world_objects->normals[triangle_index], normal);
-
     // Copy corner data to local variables for faster access
     float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
     float Ay = (*A)[1], By = (*B)[1], Cy = (*C)[1];
@@ -701,10 +698,6 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     _calc_step_constants(A_color, B_color, C_color, 4, dA_dx, dA_dy, dB_dx, dB_dy, Acolor_minus_C,
         Bcolor_minus_C, dcolor_dx, dcolor_dy);
 
-    vec3 A_normal, B_normal, C_normal;
-    glm_vec3_copy(normal, A_normal);
-    glm_vec3_copy(normal, B_normal);
-    glm_vec3_copy(normal, C_normal);
     vec3 Anormal_minus_C, Bnormal_minus_C, dnormal_dx, dnormal_dy;
     _calc_step_constants(A_normal, B_normal, C_normal, 3, dA_dx, dA_dy, dB_dx, dB_dy, Anormal_minus_C,
         Bnormal_minus_C, dnormal_dx, dnormal_dy);
@@ -869,9 +862,9 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
 
                             float lighting = glm_vec3_dot(light_direction, pixel_normal);
                             lighting = lighting > 0. ? 0. : -lighting;
-                            final_color.r = (Uint8)(fabsf(normal[0]) * 255. * lighting);
-                            final_color.g = (Uint8)(fabsf(normal[1]) * 255. * lighting);
-                            final_color.b = (Uint8)(fabsf(normal[2]) * 255. * lighting);
+                            final_color.r = (Uint8)(fabsf(pixel_normal[0]) * 255. * lighting);
+                            final_color.g = (Uint8)(fabsf(pixel_normal[1]) * 255. * lighting);
+                            final_color.b = (Uint8)(fabsf(pixel_normal[2]) * 255. * lighting);
                             //final_color.r = (Uint8)((float)(final_color.r) * lighting);
                             //final_color.g = (Uint8)((float)(final_color.g) * lighting);
                             //final_color.b = (Uint8)((float)(final_color.b) * lighting);

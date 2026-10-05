@@ -1,7 +1,7 @@
 #include "perlin_noise.h"
 
 
-float perlin_noise(vec2 point, Uint32 octaves, vec2* gradients) {
+inline float perlin_noise(vec2 point, Uint32 octaves, vec2* gradients) {
 	vec2 scaled_point = { point[0] * octaves, point[1] * octaves };
 	vec2 cell_bottom_left;
 	glm_vec2_floor(scaled_point, cell_bottom_left);
@@ -16,13 +16,13 @@ float perlin_noise(vec2 point, Uint32 octaves, vec2* gradients) {
 	glm_vec2_sub(point_normalized_in_cell, (vec2) { 1.f, 1.f }, corners_offset_vector11);
 
 	float corner_influence00 = glm_vec2_dot(corners_offset_vector00,
-		gradients[(Uint32)cell_bottom_left[0] * (octaves + 1) + (Uint32)cell_bottom_left[1]]);
+		gradients[(Uint32)corners_offset_vector00[0] * (octaves + 1) + (Uint32)corners_offset_vector00[1]]);
 	float corner_influence01 = glm_vec2_dot(corners_offset_vector01,
-		gradients[(Uint32)cell_bottom_left[0] * (octaves + 1) + (Uint32)cell_bottom_left[1] + 1]);
+		gradients[(Uint32)corners_offset_vector01[0] * (octaves + 1) + (Uint32)corners_offset_vector01[1]]);
 	float corner_influence10 = glm_vec2_dot(corners_offset_vector10,
-		gradients[((Uint32)cell_bottom_left[0] + 1) * (octaves + 1) + (Uint32)cell_bottom_left[1]]);
+		gradients[((Uint32)corners_offset_vector10[0]) * (octaves + 1) + (Uint32)corners_offset_vector10[1]]);
 	float corner_influence11 = glm_vec2_dot(corners_offset_vector11,
-		gradients[((Uint32)cell_bottom_left[0] + 1) * (octaves + 1) + (Uint32)cell_bottom_left[1] + 1]);
+		gradients[((Uint32)corners_offset_vector11[0]) * (octaves + 1) + (Uint32)corners_offset_vector11[1]]);
 
 	float interp_row0 = perlin_smoothstep(corner_influence00, corner_influence01, point_normalized_in_cell[1]);
 	float interp_row1 = perlin_smoothstep(corner_influence10, corner_influence11, point_normalized_in_cell[1]);
@@ -31,7 +31,7 @@ float perlin_noise(vec2 point, Uint32 octaves, vec2* gradients) {
 	return interp_col;
 }
 
-vec2* perlin_gradients(Uint32 octaves, Uint32 seed) {
+inline vec2* perlin_gradients(Uint32 octaves, Uint32 seed) {
 	vec2* gradients = malloc((octaves + 1) * (octaves + 1) * sizeof(vec2));
 	for (Uint32 i = 0; i < octaves + 1; i++) {
 		for (Uint32 j = 0; j < octaves + 1; j++) {
@@ -44,7 +44,7 @@ vec2* perlin_gradients(Uint32 octaves, Uint32 seed) {
 	return gradients;
 }
 
-static float perlin_smoothstep(float edge0, float edge1, float x) {
+inline static float perlin_smoothstep(float edge0, float edge1, float x) {
 	// Evaluate the 5th order polynomial : 6x ^ 5 - 15x ^ 4 + 10x ^ 3
 	return edge0 + (edge1 - edge0) * (x * x * x * (x * (x * 6.0 - 15.0) + 10.0));
 }
