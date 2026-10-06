@@ -10,10 +10,10 @@ inline float perlin_noise(vec2 point, Uint32 octaves, vec2* gradients) {
 	glm_vec2_sub(scaled_point, cell_bottom_left, point_normalized_in_cell);
 
 	vec2 corners_offset_vector00, corners_offset_vector01, corners_offset_vector10, corners_offset_vector11;
-	glm_vec2_sub(point_normalized_in_cell, (vec2) { 0.f, 0.f }, corners_offset_vector00);
-	glm_vec2_sub(point_normalized_in_cell, (vec2) { 0.f, 1.f }, corners_offset_vector01);
-	glm_vec2_sub(point_normalized_in_cell, (vec2) { 1.f, 0.f }, corners_offset_vector10);
-	glm_vec2_sub(point_normalized_in_cell, (vec2) { 1.f, 1.f }, corners_offset_vector11);
+	glm_vec2_add(cell_bottom_left, (vec2) { 0.f, 0.f }, corners_offset_vector00);
+	glm_vec2_add(cell_bottom_left, (vec2) { 0.f, 1.f }, corners_offset_vector01);
+	glm_vec2_add(cell_bottom_left, (vec2) { 1.f, 0.f }, corners_offset_vector10);
+	glm_vec2_add(cell_bottom_left, (vec2) { 1.f, 1.f }, corners_offset_vector11);
 
 	float corner_influence00 = glm_vec2_dot(corners_offset_vector00,
 		gradients[(Uint32)corners_offset_vector00[0] * (octaves + 1) + (Uint32)corners_offset_vector00[1]]);
