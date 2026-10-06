@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 5, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(100, 10, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -203,12 +203,13 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         glm_vec3_add(bottom_left, up_steps_from_origin, current_bottom);
         glm_vec3_add(current_bottom, up_step, current_top);
 
-        for (Uint32 col = 0; col < num_vertices_in_row - 1; col+=2) {
+        for (Uint32 col = 0; col < num_vertices_in_row - 1; col += 2) {
             Uint32 bottom_idx = row * num_vertices_in_row + col;
             Uint32 prev_top_idx = (row - 1) * num_vertices_in_row + col + 1;
             Uint32 top_idx = bottom_idx + 1;
             glm_vec3_copy(obj->positions[prev_top_idx], obj->positions[bottom_idx]);
             glm_vec2_copy(obj->uvs[prev_top_idx], obj->uvs[bottom_idx]);
+            glm_vec3_copy(obj->normals[prev_top_idx], obj->normals[bottom_idx]);
 
             glm_vec3_copy(current_top, obj->positions[top_idx]);
             vec2 position2d = { (float)obj->positions[top_idx][0], (float)obj->positions[top_idx][2] };

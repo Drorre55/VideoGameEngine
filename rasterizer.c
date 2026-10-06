@@ -861,7 +861,7 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
                             pixel_normal[2] = (*C_normal)[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
 
                             float lighting = glm_vec3_dot(light_direction, pixel_normal);
-                            lighting = lighting > 0. ? 0. : 1;// -lighting;
+                            lighting = lighting > 0. ? 0. : -lighting;
                             final_color.r = (Uint8)(fabsf(pixel_normal[0]) * 255. * lighting);
                             final_color.g = (Uint8)(fabsf(pixel_normal[1]) * 255. * lighting);
                             final_color.b = (Uint8)(fabsf(pixel_normal[2]) * 255. * lighting);
