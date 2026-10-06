@@ -355,7 +355,7 @@ Color texture_sample_nearest(const Mipmap mipmap, float u, float v)
     return pixel;
 }
 
-inline Color texture_sample_bilinear(const Mipmap mipmap, float u, float v)
+static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float v)
 {
     Color pixel = { 0, 0, 0, 255 };
 
@@ -426,7 +426,7 @@ inline Uint32 clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value)
     return value;
 }
 
-inline Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
+Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
 {
     Mipmap original_image = texture.mipmaps[0];
 
@@ -454,10 +454,10 @@ inline Color texture_sample_trilinear(const TiledTexture texture, float u, float
     high_mipmap = clamp_u32(high_mipmap, 0, texture.num_levels - 1);
     
     if (low_mipmap == high_mipmap)
-        return texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
+        return _texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
     
-    Color low_mipmap_color = texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
-    Color high_mipmap_color = texture_sample_bilinear(texture.mipmaps[high_mipmap], u, v);
+    Color low_mipmap_color = _texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
+    Color high_mipmap_color = _texture_sample_bilinear(texture.mipmaps[high_mipmap], u, v);
 
     Color pixel = { 0, 0, 0, 255 };
 

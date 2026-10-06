@@ -120,12 +120,39 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         vec2 position2d = { (float)obj->positions[col][0], (float)obj->positions[col][2] };
         glm_vec2_add(position2d, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-        obj->positions[col][1] = 100 * (
-            perlin_noise(normalized_point, 3, gradients3) 
-            + 0.5 * perlin_noise(normalized_point, 6, gradients6)
-            + 0.25 * perlin_noise(normalized_point, 12, gradients12)
-            + 0.125 * perlin_noise(normalized_point, 24, gradients24)
+
+        PerlinResult perlin3, perlin6, perlin12, perlin24;
+        perlin3 = calc_perlin(normalized_point, 3, gradients3);
+        perlin6 = calc_perlin(normalized_point, 6, gradients6);
+        perlin12 = calc_perlin(normalized_point, 12, gradients12);
+        perlin24 = calc_perlin(normalized_point, 24, gradients24);
+        
+        obj->positions[col][1] = 100.0 * (
+            perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
             );
+
+        vec2 derivative = {
+            100.0 * (
+                perlin3.derivative[0] +
+                0.5 * perlin6.derivative[0] +
+                0.25 * perlin12.derivative[0] +
+                0.125 * perlin24.derivative[0]
+                ),
+            100.0 * (
+                perlin3.derivative[1] +
+                0.5 * perlin6.derivative[1] +
+                0.25 * perlin12.derivative[1] +
+                0.125 * perlin24.derivative[1]
+                )
+        };
+        vec3 normal = {
+            -derivative[0],
+            2.0 * radius,
+            -derivative[1]
+        };
+        glm_vec3_normalize(normal);
+        glm_vec3_copy(normal, obj->normals[col]);
+
         obj->uvs[col][0] = _normalize_to_01(obj->positions[col][0], (2.f * texture_tile_radius));
         obj->uvs[col][1] = _normalize_to_01(obj->positions[col][2], (2.f * texture_tile_radius));
         
@@ -133,13 +160,40 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         vec2 position2d_next = { (float)obj->positions[col + 1][0], (float)obj->positions[col + 1][2] };
         glm_vec2_add(position2d_next, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-        obj->positions[col + 1][1] = 100 * (
-            perlin_noise(normalized_point, 3, gradients3)
-            + 0.5 * perlin_noise(normalized_point, 6, gradients6)
-            + 0.25 * perlin_noise(normalized_point, 12, gradients12)
-            + 0.125 * perlin_noise(normalized_point, 24, gradients24));
-        obj->uvs[col + 1][0] = _normalize_to_01(obj->positions[col + 1][0], (2.f * texture_tile_radius));
-        obj->uvs[col + 1][1] = _normalize_to_01(obj->positions[col + 1][2], (2.f * texture_tile_radius));
+
+        perlin3 = calc_perlin(normalized_point, 3, gradients3);
+        perlin6 = calc_perlin(normalized_point, 6, gradients6);
+        perlin12 = calc_perlin(normalized_point, 12, gradients12);
+        perlin24 = calc_perlin(normalized_point, 24, gradients24);
+        
+        obj->positions[col + 1][1] = 100.0 * (
+            perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
+            );
+
+        vec2 derivative1 = {
+            100.0 * (
+                perlin3.derivative[0] +
+                0.5 * perlin6.derivative[0] +
+                0.25 * perlin12.derivative[0] +
+                0.125 * perlin24.derivative[0]
+                ),
+            100.0 * (
+                perlin3.derivative[1] +
+                0.5 * perlin6.derivative[1] +
+                0.25 * perlin12.derivative[1] +
+                0.125 * perlin24.derivative[1]
+                )
+        };
+        vec3 normal1 = {
+            -derivative1[0],
+            2.0 * radius,
+            -derivative1[1]
+        };
+        glm_vec3_normalize(normal1);
+        glm_vec3_copy(normal1, obj->normals[col + 1]);
+
+        obj->uvs[col + 1][0] = _normalize_to_01(obj->positions[col + 1][0], (2.0 * texture_tile_radius));
+        obj->uvs[col + 1][1] = _normalize_to_01(obj->positions[col + 1][2], (2.0 * texture_tile_radius));
 
         glm_vec3_add(current_bottom, right_step, current_bottom);
         glm_vec3_add(current_top, right_step, current_top);
@@ -160,11 +214,38 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
             vec2 position2d = { (float)obj->positions[top_idx][0], (float)obj->positions[top_idx][2] };
             glm_vec2_add(position2d, max_bounds, normalize_numerator);
             glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-            obj->positions[row * num_vertices_in_row + col + 1][1] = 100 * (
-                perlin_noise(normalized_point, 3, gradients3)
-                + 0.5 * perlin_noise(normalized_point, 6, gradients6)
-                + 0.25 * perlin_noise(normalized_point, 12, gradients12)
-                + 0.125 * perlin_noise(normalized_point, 24, gradients24));
+            
+            PerlinResult perlin3 = calc_perlin(normalized_point, 3, gradients3);
+            PerlinResult perlin6 = calc_perlin(normalized_point, 6, gradients6);
+            PerlinResult perlin12 = calc_perlin(normalized_point, 12, gradients12);
+            PerlinResult perlin24 = calc_perlin(normalized_point, 24, gradients24);
+
+            obj->positions[row * num_vertices_in_row + col + 1][1] = 100.0 * (
+                perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
+                );
+
+            vec2 derivative = {
+                100.0 * (
+                    perlin3.derivative[0] + 
+                    0.5 * perlin6.derivative[0] + 
+                    0.25 * perlin12.derivative[0] + 
+                    0.125 * perlin24.derivative[0]
+                    ),
+                100.0 * (
+                    perlin3.derivative[1] +
+                    0.5 * perlin6.derivative[1] +
+                    0.25 * perlin12.derivative[1] +
+                    0.125 * perlin24.derivative[1]
+                    )
+            };
+            vec3 normal = { 
+                -derivative[0], 
+                2.0 * radius, 
+                -derivative[1] 
+            };
+            glm_vec3_normalize(normal);
+            glm_vec3_copy(normal, obj->normals[top_idx]);
+
             obj->uvs[top_idx][0] = _normalize_to_01(obj->positions[top_idx][0], (2.f * texture_tile_radius));
             obj->uvs[top_idx][1] = _normalize_to_01(obj->positions[top_idx][2], (2.f * texture_tile_radius));
 
@@ -239,7 +320,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
             free(temp_colors);
             return NULL;
         }
-        Uint32* temp_normals = realloc(objects->normals, concat_num_vertices * sizeof(vec3));
+        vec3* temp_normals = realloc(objects->normals, concat_num_vertices * sizeof(vec3));
         if (!temp_normals) {
             SDL_LogError(1, "Error: Failed to concat_world_objects");
             free(temp_vertices);
@@ -271,7 +352,7 @@ WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_obje
             glm_vec3_copy(world_objects[i]->positions[j], objects->positions[concat_idx]);
             memcpy(&(objects->colors[concat_idx]), &(world_objects[i]->colors[j]), sizeof(Color));
             glm_vec2_copy(world_objects[i]->uvs[j], objects->uvs[concat_idx]);
-            glm_vec3_copy(objects->normals[concat_idx], world_objects[i]->normals[j]);
+            glm_vec3_copy(world_objects[i]->normals[j], objects->normals[concat_idx]);
         }
         for (Uint32 j = 0; j < world_objects[i]->texture_bank.count; j++) {
             TiledTexture tex_copy = texture_clone(world_objects[i]->texture_bank.textures[j]);

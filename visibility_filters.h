@@ -16,7 +16,7 @@ typedef struct {
 } ClipPlane;
 
 void visibility_culling(WorldObjects* world_objects, Camera* camera);
-void backface_culling(WorldObjects* world_objects, Camera* camera);
+static void _backface_culling(WorldObjects* world_objects, Camera* camera);
 void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camera);
 void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera);
 void transform_FOV_space_to_01_scale(WorldObjects* world_objects);

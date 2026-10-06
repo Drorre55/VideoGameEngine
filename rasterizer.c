@@ -641,9 +641,9 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
     vec2* A_uv = uvs[sorted_triangle.corner1_idx];
     vec2* B_uv = uvs[sorted_triangle.corner2_idx];
     vec2* C_uv = uvs[sorted_triangle.corner3_idx];
-    vec2* A_normal = normals[sorted_triangle.corner1_idx];
-    vec2* B_normal = normals[sorted_triangle.corner2_idx];
-    vec2* C_normal = normals[sorted_triangle.corner3_idx];
+    vec3* A_normal = normals[sorted_triangle.corner1_idx];
+    vec3* B_normal = normals[sorted_triangle.corner2_idx];
+    vec3* C_normal = normals[sorted_triangle.corner3_idx];
 
     // Copy corner data to local variables for faster access
     float Ax = (*A)[0], Bx = (*B)[0], Cx = (*C)[0];
@@ -856,12 +856,12 @@ static void _draw_triangle(Uint32 triangle_index, WorldObjects* world_objects, v
                                 };
                             }
                             vec3 pixel_normal;
-                            pixel_normal[0] = C_normal[0] + Anormal_minus_C[0] * wA + Bnormal_minus_C[0] * wB;
-                            pixel_normal[1] = C_normal[1] + Anormal_minus_C[1] * wA + Bnormal_minus_C[1] * wB;
-                            pixel_normal[2] = C_normal[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
+                            pixel_normal[0] = (*C_normal)[0] + Anormal_minus_C[0] * wA + Bnormal_minus_C[0] * wB;
+                            pixel_normal[1] = (*C_normal)[1] + Anormal_minus_C[1] * wA + Bnormal_minus_C[1] * wB;
+                            pixel_normal[2] = (*C_normal)[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
 
                             float lighting = glm_vec3_dot(light_direction, pixel_normal);
-                            lighting = lighting > 0. ? 0. : -lighting;
+                            lighting = lighting > 0. ? 0. : 1;// -lighting;
                             final_color.r = (Uint8)(fabsf(pixel_normal[0]) * 255. * lighting);
                             final_color.g = (Uint8)(fabsf(pixel_normal[1]) * 255. * lighting);
                             final_color.b = (Uint8)(fabsf(pixel_normal[2]) * 255. * lighting);

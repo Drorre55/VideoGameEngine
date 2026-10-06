@@ -2,10 +2,10 @@
 
 
 void visibility_culling(WorldObjects* world_objects, Camera* camera) {
-	backface_culling(world_objects, camera);
+	_backface_culling(world_objects, camera);
 }
 
-void backface_culling(WorldObjects* world_objects, Camera* camera)
+static void _backface_culling(WorldObjects* world_objects, Camera* camera)
 {
 	for (Uint32 i = 0; i < world_objects->num_triangles; i++) {
 		Triangle triangle = world_objects->triangles[i];
@@ -20,14 +20,12 @@ void backface_culling(WorldObjects* world_objects, Camera* camera)
 		if (glm_vec3_dot(position_to_camera, normal) >= 0) {
 			world_objects->triangles[i] = 
 				world_objects->triangles[world_objects->num_triangles - 1];
-			glm_vec3_copy(world_objects->normals[world_objects->num_triangles - 1], world_objects->normals[i]);
 			world_objects->triangle_texture_indices[i] = 
 				world_objects->triangle_texture_indices[world_objects->num_triangles - 1];
 			world_objects->num_triangles--;
 			i--;
 			continue;
 		}
-		glm_vec3_copy(normal, world_objects->normals[i]);
 	}
 }
 
@@ -58,25 +56,59 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 		{ 0.0f, -1.0f, vertical_scale, 0.0f }
 	};
 
-   // A clipped triangle can have up to 9 polygon positions, producing 7 triangles.
+    // A clipped triangle can have up to 9 polygon positions, producing 7 triangles.
 	// Output triangles use independent positions, so each output triangle needs 3 positions.
 	Uint32 maximum_triangles = camera_space_objects->num_triangles * 7;
 	Uint32 maximum_vertices = maximum_triangles * 3;
 
 	vec3* clipped_vertices = malloc(sizeof(vec3) * maximum_vertices);
+	if (!clipped_vertices) {
+		SDL_LogError(1, "Could not allocate memory for frustum clipping");
+		free(clipped_vertices); 
+		return;
+	}
 	Color* clipped_colors = malloc(sizeof(Color) * maximum_vertices);
+	if (!clipped_vertices) {
+		SDL_LogError(1, "Could not allocate memory for frustum clipping");
+		free(clipped_vertices);
+		free(clipped_colors);
+		return;
+	}
 	vec2* clipped_uvs = malloc(sizeof(vec2) * maximum_vertices);
-	Triangle* clipped_triangles = malloc(sizeof(Triangle) * maximum_triangles);
-	vec3* clipped_normals = malloc(sizeof(vec3) * maximum_triangles);
-	Uint32* clipped_texture_indices = malloc(sizeof(Uint32) * maximum_triangles);
-
-	if (clipped_vertices == NULL || clipped_colors == NULL || clipped_uvs == NULL || clipped_triangles == NULL) {
+	if (!clipped_vertices) {
 		SDL_LogError(1, "Could not allocate memory for frustum clipping");
 		free(clipped_vertices);
 		free(clipped_colors);
 		free(clipped_uvs);
-		free(clipped_triangles);
+		return;
+	}
+	vec3* clipped_normals = malloc(sizeof(vec3) * maximum_vertices);
+	if (!clipped_vertices) {
+		SDL_LogError(1, "Could not allocate memory for frustum clipping");
+		free(clipped_vertices);
+		free(clipped_colors);
+		free(clipped_uvs);
 		free(clipped_normals);
+		return;
+	}
+	Triangle* clipped_triangles = malloc(sizeof(Triangle) * maximum_triangles);
+	if (!clipped_vertices) {
+		SDL_LogError(1, "Could not allocate memory for frustum clipping");
+		free(clipped_vertices);
+		free(clipped_colors);
+		free(clipped_uvs);
+		free(clipped_normals);
+		free(clipped_triangles);
+		return;
+	}
+	Uint32* clipped_texture_indices = malloc(sizeof(Uint32) * maximum_triangles);
+	if (!clipped_texture_indices) {
+		SDL_LogError(1, "Could not allocate memory for frustum clipping");
+		free(clipped_vertices);
+		free(clipped_colors);
+		free(clipped_uvs);
+		free(clipped_normals);
+		free(clipped_triangles);
 		free(clipped_texture_indices);
 		return;
 	}
@@ -104,8 +136,8 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			glm_vec3_copy(camera_space_objects->positions[source_index], polygon_a[i].position);
 			polygon_a[i].color = camera_space_objects->colors[source_index];
 			glm_vec2_copy(camera_space_objects->uvs[source_index], polygon_a[i].uv);
-			glm_vec3_copy(camera_space_objects->uvs[source_index], polygon_a[i].normal);
-		}	
+			glm_vec3_copy(camera_space_objects->normals[source_index], polygon_a[i].normal);
+		}
 
 		ClipVertex* input_polygon = polygon_a;
 		ClipVertex* output_polygon = polygon_b;
@@ -157,12 +189,14 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			glm_vec2_copy(second->uv, clipped_uvs[second_index]);
 			glm_vec2_copy(third->uv, clipped_uvs[third_index]);
 
+			glm_vec3_copy(first->normal, clipped_normals[first_index]);
+			glm_vec3_copy(second->normal, clipped_normals[second_index]);
+			glm_vec3_copy(third->normal, clipped_normals[third_index]);
+
 			clipped_triangles[triangle_count].corner1_idx = first_index;
 			clipped_triangles[triangle_count].corner2_idx = second_index;
 			clipped_triangles[triangle_count].corner3_idx = third_index;
 
-			glm_vec3_copy(camera_space_objects->normals[triangle_index], clipped_normals[triangle_count]);
-			
 			clipped_texture_indices[triangle_count] = camera_space_objects->triangle_texture_indices[triangle_index];
 
 			triangle_count++;
@@ -172,15 +206,15 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	free(camera_space_objects->positions);
 	free(camera_space_objects->colors);
 	free(camera_space_objects->uvs);
-	free(camera_space_objects->triangles);
 	free(camera_space_objects->normals);
+	free(camera_space_objects->triangles);
 	free(camera_space_objects->triangle_texture_indices);
 
 	camera_space_objects->positions = clipped_vertices;
 	camera_space_objects->colors = clipped_colors;
 	camera_space_objects->uvs = clipped_uvs;
-	camera_space_objects->triangles = clipped_triangles;
 	camera_space_objects->normals = clipped_normals;
+	camera_space_objects->triangles = clipped_triangles;
 	camera_space_objects->triangle_texture_indices = clipped_texture_indices;
 	camera_space_objects->num_vertices = position_count;
 	camera_space_objects->num_triangles = triangle_count;
@@ -240,13 +274,18 @@ static ClipVertex _interpolate_clip_position(const ClipVertex* first, const Clip
 	result.position[1] = first->position[1] + (second->position[1] - first->position[1]) * interpolation;
 	result.position[2] = first->position[2] + (second->position[2] - first->position[2]) * interpolation;
 
-	result.color.r = (Uint8)(first->color.r + (second->color.r - first->color.r) * interpolation);
-	result.color.g = (Uint8)(first->color.g + (second->color.g - first->color.g) * interpolation);
-	result.color.b = (Uint8)(first->color.b + (second->color.b - first->color.b) * interpolation);
-	result.color.a = (Uint8)(first->color.a + (second->color.a - first->color.a) * interpolation);
+	result.color.r = (first->color.r + (Uint8)((float)second->color.r - (float)first->color.r) * interpolation);
+	result.color.g = (first->color.g + (Uint8)((float)second->color.g - (float)first->color.g) * interpolation);
+	result.color.b = (first->color.b + (Uint8)((float)second->color.b - (float)first->color.b) * interpolation);
+	result.color.a = (first->color.a + (Uint8)((float)second->color.a - (float)first->color.a) * interpolation);
 
 	result.uv[0] = first->uv[0] + (second->uv[0] - first->uv[0]) * interpolation;
 	result.uv[1] = first->uv[1] + (second->uv[1] - first->uv[1]) * interpolation;
+
+	result.normal[0] = first->normal[0] + (second->normal[0] - first->normal[0]) * interpolation;
+	result.normal[1] = first->normal[1] + (second->normal[1] - first->normal[1]) * interpolation;
+	result.normal[2] = first->normal[2] + (second->normal[2] - first->normal[2]) * interpolation;
+	glm_vec3_normalize(result.normal);
 
 	return result;
 }
