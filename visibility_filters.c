@@ -43,7 +43,7 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 	
 	ClipPlane planes[6] = {
 		// Near:       z >= near
-		{ 0.0f, 0.0f, 1.0f, -VIEW_FRUSTUM_MIN },
+		{ 0.0f, 0.0f, 1.0f, VIEW_FRUSTUM_MIN },
 		// Far:        z <= far
 		{ 0.0f, 0.0f, -1.0f, VIEW_FRUSTUM_MAX },
 		// Left:       x >= -z * horizontal_scale
@@ -139,8 +139,8 @@ void clip_triangles_to_frustum(WorldObjects* camera_space_objects, Camera* camer
 			glm_vec3_copy(camera_space_objects->normals[source_index], polygon_a[i].normal);
 		}
 
-		ClipVertex* input_polygon = polygon_a;
-		ClipVertex* output_polygon = polygon_b;
+		ClipVertex* input_polygon = &polygon_a;
+		ClipVertex* output_polygon = &polygon_b;
 
 		for (Uint32 plane_index = 0; plane_index < 6; plane_index++) {
 			polygon_count = _clip_polygon_against_plane(input_polygon, polygon_count, 

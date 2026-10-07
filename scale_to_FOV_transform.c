@@ -17,6 +17,7 @@ void transform_scale_to_FOV(WorldObjects* world_objects, Camera* camera) {
 
 		world_objects->uvs[i][0] /= position_z;
 		world_objects->uvs[i][1] /= position_z;
+		
 	}
 }
 

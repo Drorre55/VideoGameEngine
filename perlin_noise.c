@@ -11,22 +11,22 @@ PerlinResult calc_perlin(vec2 point, Uint32 octaves, vec2* gradients) {
 	vec2 point_normalized_in_cell;
 	glm_vec2_sub(scaled_point, cell_bottom_left, point_normalized_in_cell);
 
-	vec2 corners_offset_vector00, corners_offset_vector01, corners_offset_vector10, corners_offset_vector11;
-	glm_vec2_add(cell_bottom_left, (vec2) { 0.f, 0.f }, corners_offset_vector00);
-	glm_vec2_add(cell_bottom_left, (vec2) { 0.f, 1.f }, corners_offset_vector01);
-	glm_vec2_add(cell_bottom_left, (vec2) { 1.f, 0.f }, corners_offset_vector10);
-	glm_vec2_add(cell_bottom_left, (vec2) { 1.f, 1.f }, corners_offset_vector11);
+	vec2 corner_offset_vector00, corner_offset_vector01, corner_offset_vector10, corner_offset_vector11;
+	glm_vec2_sub(point_normalized_in_cell, (vec2) { 0.f, 0.f }, corner_offset_vector00);
+	glm_vec2_sub(point_normalized_in_cell, (vec2) { 0.f, 1.f }, corner_offset_vector01);
+	glm_vec2_sub(point_normalized_in_cell, (vec2) { 1.f, 0.f }, corner_offset_vector10);
+	glm_vec2_sub(point_normalized_in_cell, (vec2) { 1.f, 1.f }, corner_offset_vector11);
 
 	vec2 *gradient00, *gradient01, *gradient10, *gradient11;
-	gradient00 = gradients[(Uint32)corners_offset_vector00[0] * (octaves + 1) + (Uint32)corners_offset_vector00[1]];
-	gradient01 = gradients[(Uint32)corners_offset_vector01[0] * (octaves + 1) + (Uint32)corners_offset_vector01[1]];
-	gradient10 = gradients[((Uint32)corners_offset_vector10[0]) * (octaves + 1) + (Uint32)corners_offset_vector10[1]];
-	gradient11 = gradients[((Uint32)corners_offset_vector11[0]) * (octaves + 1) + (Uint32)corners_offset_vector11[1]];
+	gradient00 = gradients[(Uint32)cell_bottom_left[0] * (octaves + 1) + (Uint32)cell_bottom_left[1]];
+	gradient01 = gradients[(Uint32)cell_bottom_left[0] * (octaves + 1) + (Uint32)cell_bottom_left[1] + 1];
+	gradient10 = gradients[((Uint32)cell_bottom_left[0] + 1) * (octaves + 1) + (Uint32)cell_bottom_left[1]];
+	gradient11 = gradients[((Uint32)cell_bottom_left[0] + 1) * (octaves + 1) + (Uint32)cell_bottom_left[1] + 1];
 
-	float corner_influence00 = glm_vec2_dot(corners_offset_vector00, gradient00);
-	float corner_influence01 = glm_vec2_dot(corners_offset_vector01, gradient01);
-	float corner_influence10 = glm_vec2_dot(corners_offset_vector10, gradient10);
-	float corner_influence11 = glm_vec2_dot(corners_offset_vector11, gradient11);
+	float corner_influence00 = glm_vec2_dot(corner_offset_vector00, gradient00);
+	float corner_influence01 = glm_vec2_dot(corner_offset_vector01, gradient01);
+	float corner_influence10 = glm_vec2_dot(corner_offset_vector10, gradient10);
+	float corner_influence11 = glm_vec2_dot(corner_offset_vector11, gradient11);
 
 	vec2 dcorner_influence00_dxz, dcorner_influence01_dxz, dcorner_influence10_dxz, dcorner_influence11_dxz;
 	glm_vec2_copy(gradient00, dcorner_influence00_dxz);
@@ -48,7 +48,7 @@ PerlinResult calc_perlin(vec2 point, Uint32 octaves, vec2* gradients) {
 	float interp_col = interp_row0 + (interp_row1 - interp_row0) * p_smoothstep_polynomial[0];
 	result.noise = interp_col;
 
-	vec2 dinterp_row0_dxz = {
+	/*vec2 dinterp_row0_dxz = {
 		(
 			dcorner_influence00_dxz[0] +
 			(dcorner_influence01_dxz[0] - dcorner_influence00_dxz[0]) * p_smoothstep_polynomial[1]
@@ -79,6 +79,14 @@ PerlinResult calc_perlin(vec2 point, Uint32 octaves, vec2* gradients) {
 		(
 			dinterp_row0_dxz[1] +
 			(dinterp_row1_dxz[1] - dinterp_row0_dxz[1]) * p_smoothstep_polynomial[0]
+			)
+	};*/
+	vec2 dinterp_col_dxz = {
+		(
+			(interp_row1 - interp_row0) * p_smoothstep_polynomial_der[0]
+			),
+		(
+			(corner_influence01 - corner_influence00 + (corner_influence11 - corner_influence10 - corner_influence01 + corner_influence00) * p_smoothstep_polynomial[0])
 			)
 	};
 	glm_vec2_copy(dinterp_col_dxz, result.derivative);

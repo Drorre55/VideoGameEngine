@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(100, 10, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 5, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -103,6 +103,8 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     vec2* gradients12 = perlin_gradients(12, 42);
     vec2* gradients24 = perlin_gradients(24, 42);
 
+    float multiplier = 2.;
+
     // Preperation for normalization [0, 1]
     vec2 normalize_numerator, normalize_denominator, normalized_point;
     vec2 max_bounds = { (float)(radius), (float)(radius) };
@@ -120,6 +122,8 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         vec2 position2d = { (float)obj->positions[col][0], (float)obj->positions[col][2] };
         glm_vec2_add(position2d, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
+        normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
+        normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
 
         PerlinResult perlin3, perlin6, perlin12, perlin24;
         perlin3 = calc_perlin(normalized_point, 3, gradients3);
@@ -128,22 +132,22 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         perlin24 = calc_perlin(normalized_point, 24, gradients24);
         
         obj->positions[col][1] = 100.0 * (
-            perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
-            );
+            0.5 * perlin3.noise + 0.25 * perlin6.noise + 0.125 * perlin12.noise + 0.0625 * perlin24.noise
+            ) * multiplier;
 
         vec2 derivative = {
             100.0 * (
-                perlin3.derivative[0] +
-                0.5 * perlin6.derivative[0] +
-                0.25 * perlin12.derivative[0] +
-                0.125 * perlin24.derivative[0]
-                ),
+                0.5 * perlin3.derivative[0] +
+                0.25 * perlin6.derivative[0] +
+                0.125 * perlin12.derivative[0] +
+                0.0625 * perlin24.derivative[0]
+                ) * multiplier,
             100.0 * (
-                perlin3.derivative[1] +
-                0.5 * perlin6.derivative[1] +
-                0.25 * perlin12.derivative[1] +
-                0.125 * perlin24.derivative[1]
-                )
+                0.5 * perlin3.derivative[1] +
+                0.25 * perlin6.derivative[1] +
+                0.125 * perlin12.derivative[1] +
+                0.0625 * perlin24.derivative[1]
+                ) * multiplier
         };
         vec3 normal = {
             -derivative[0],
@@ -160,6 +164,8 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         vec2 position2d_next = { (float)obj->positions[col + 1][0], (float)obj->positions[col + 1][2] };
         glm_vec2_add(position2d_next, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
+        normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
+        normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
 
         perlin3 = calc_perlin(normalized_point, 3, gradients3);
         perlin6 = calc_perlin(normalized_point, 6, gradients6);
@@ -167,22 +173,22 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         perlin24 = calc_perlin(normalized_point, 24, gradients24);
         
         obj->positions[col + 1][1] = 100.0 * (
-            perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
-            );
+            0.5 * perlin3.noise + 0.25 * perlin6.noise + 0.125 * perlin12.noise + 0.0625 * perlin24.noise
+            ) * multiplier;
 
         vec2 derivative1 = {
             100.0 * (
-                perlin3.derivative[0] +
-                0.5 * perlin6.derivative[0] +
-                0.25 * perlin12.derivative[0] +
-                0.125 * perlin24.derivative[0]
-                ),
+                0.5 * perlin3.derivative[0] +
+                0.25 * perlin6.derivative[0] +
+                0.125 * perlin12.derivative[0] +
+                0.0625 * perlin24.derivative[0]
+                ) * multiplier,
             100.0 * (
-                perlin3.derivative[1] +
-                0.5 * perlin6.derivative[1] +
-                0.25 * perlin12.derivative[1] +
-                0.125 * perlin24.derivative[1]
-                )
+                0.5 * perlin3.derivative[1] +
+                0.25 * perlin6.derivative[1] +
+                0.125 * perlin12.derivative[1] +
+                0.0625 * perlin24.derivative[1]
+                ) * multiplier
         };
         vec3 normal1 = {
             -derivative1[0],
@@ -215,29 +221,34 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
             vec2 position2d = { (float)obj->positions[top_idx][0], (float)obj->positions[top_idx][2] };
             glm_vec2_add(position2d, max_bounds, normalize_numerator);
             glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-            
+            normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
+            normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
+
             PerlinResult perlin3 = calc_perlin(normalized_point, 3, gradients3);
             PerlinResult perlin6 = calc_perlin(normalized_point, 6, gradients6);
             PerlinResult perlin12 = calc_perlin(normalized_point, 12, gradients12);
             PerlinResult perlin24 = calc_perlin(normalized_point, 24, gradients24);
+            if (isnan(perlin24.noise)) {
+                printf("nan value in index: %d\n", row * num_vertices_in_row + col + 1);
+            }
 
             obj->positions[row * num_vertices_in_row + col + 1][1] = 100.0 * (
-                perlin3.noise + 0.5 * perlin6.noise + 0.25 * perlin12.noise + 0.125 * perlin24.noise
-                );
-
+                0.5 * perlin3.noise + 0.25 * perlin6.noise + 0.125 * perlin12.noise + 0.0625 * perlin24.noise
+                ) * multiplier;
+            
             vec2 derivative = {
                 100.0 * (
-                    perlin3.derivative[0] + 
-                    0.5 * perlin6.derivative[0] + 
-                    0.25 * perlin12.derivative[0] + 
-                    0.125 * perlin24.derivative[0]
-                    ),
+                    0.5 * perlin3.derivative[0] + 
+                    0.25 * perlin6.derivative[0] + 
+                    0.125 * perlin12.derivative[0] + 
+                    0.0625 * perlin24.derivative[0]
+                    ) * multiplier,
                 100.0 * (
-                    perlin3.derivative[1] +
-                    0.5 * perlin6.derivative[1] +
-                    0.25 * perlin12.derivative[1] +
-                    0.125 * perlin24.derivative[1]
-                    )
+                    0.5 * perlin3.derivative[1] +
+                    0.25 * perlin6.derivative[1] +
+                    0.125 * perlin12.derivative[1] +
+                    0.0625 * perlin24.derivative[1]
+                    ) * multiplier
             };
             vec3 normal = { 
                 -derivative[0], 

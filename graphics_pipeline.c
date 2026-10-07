@@ -5,7 +5,7 @@
 void run_graphics_pipeline(Uint32* framebuffer, float* z_buffer, WorldObjects* world_objects, Camera* camera, 
 	Uint32 frame_width, Uint32 frame_height)
 {
-	vec3 sun_light_dir = { -0.6, -0.4, -1. };
+	vec3 sun_light_dir = { -1., -0., 0. };//{ -0.6, -0.4, -1. };
 	glm_vec3_normalize(sun_light_dir);
 	visibility_culling(world_objects, camera);
 	transform_from_world_to_camera_space(world_objects, camera);
