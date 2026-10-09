@@ -8,6 +8,10 @@
 
 // --- HELPER FUNCTIONS ---
 
+typedef struct {
+    __m256 r, g, b, a;
+} ColorSIMD;
+
 // Simulated PDEP/Interleave bit math across 8 lanes: xxxxxxxxABCDEFGH -> 0A0B0C0D0E0F0G0H
 inline __m256i bit_interleave_AVX2(__m256i x) {
     x = _mm256_and_si256(x, _mm256_set1_epi32(0x0000FFFF));
@@ -150,9 +154,10 @@ void sample_mip_level_soa(const Color* mip_ptr, Uint32 width_in_tiles, __m256i u
 }
 
 // THE UNIFIED BLOCK EXECUTION LOOP ENTRYPOINT
-void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_buffer, uint32_t* frame_buffer,
+static inline ColorSIMD process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_buffer, uint32_t* frame_buffer,
     __m256i int_mask, __m256 z_vec,
-    __m256 u_vec, __m256 v_vec, TiledTexture* texture)
+    __m256 u_vec, __m256 v_vec, TiledTexture* texture,
+    __m256 lighting)
 {
 
     // --- STAGE 2: PARALLEL QUAD DERIVATIVES & ANISOTROPIC FOOTPRINT ---
@@ -262,34 +267,12 @@ void process_rasterizer_block_4x2(int x, int y, int screen_width, float* depth_b
     gamma = _mm256_max_ps(_mm256_min_ps(gamma, _mm256_set1_ps(1.0f)), _mm256_setzero_ps());
 
     // --- STAGE 5: FINAL FMA TRILINEAR BLENDING ---
-    __m256 final_R = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_R, mipN_R), mipN_R);
-    __m256 final_G = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_G, mipN_G), mipN_G);
-    __m256 final_B = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_B, mipN_B), mipN_B);
-    __m256 final_A = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_A, mipN_A), mipN_A);
-    // --- STAGE 6: RE-PACKING AND MASKED STORAGE OUTPUT ---
-    __m256i out_A = _mm256_cvtps_epi32(final_A);
-    __m256i out_B = _mm256_slli_epi32(_mm256_cvtps_epi32(final_B), 8);
-    __m256i out_G = _mm256_slli_epi32(_mm256_cvtps_epi32(final_G), 16);
-    __m256i out_R = _mm256_slli_epi32(_mm256_cvtps_epi32(final_R), 24);
-    __m256i packed_output = _mm256_or_si256(_mm256_or_si256(out_R, out_G), _mm256_or_si256(out_B, out_A));
-    // Update the buffers using native hardware masked stores
-    // Extract split elements for 128-bit vector lanes
-    __m128i mask_row0 = _mm256_castsi256_si128(int_mask);
-    __m128i mask_row1 = _mm256_extracti128_si256(int_mask, 1);
-
-    __m128 z_row0 = _mm256_castps256_ps128(z_vec);
-    __m128 z_row1 = _mm256_extractf128_ps(z_vec, 1);
-
-    __m128i color_row0 = _mm256_castsi256_si128(packed_output);
-    __m128i color_row1 = _mm256_extracti128_si256(packed_output, 1);
-
-    // Save Row Y cleanly
-    _mm_maskstore_ps(depth_buffer + (y * screen_width) + x, mask_row0, z_row0);
-    _mm_maskstore_epi32((int*)(frame_buffer + (y * screen_width) + x), mask_row0, color_row0);
-
-    // Save Row Y+1 cleanly
-    _mm_maskstore_ps(depth_buffer + ((y + 1) * screen_width) + x, mask_row1, z_row1);
-    _mm_maskstore_epi32((int*)(frame_buffer + ((y + 1) * screen_width) + x), mask_row1, color_row1);
+    return (ColorSIMD) {
+        .r = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_R, mipN_R), mipN_R),
+            .g = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_G, mipN_G), mipN_G),
+            .b = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_B, mipN_B), mipN_B),
+            .a = _mm256_fmadd_ps(gamma, _mm256_sub_ps(mipNext_A, mipN_A), mipN_A)
+    };
 }
 
 #include <stdint.h>
@@ -300,6 +283,7 @@ typedef struct {
     float x, y, z;
     float u, v;
     float r, g, b, a;
+    float nx, ny, nz;
 } Vertex;
 
 // Helper to find the minimum of 3 integers
@@ -315,11 +299,12 @@ inline float fmax3(float a, float b, float c) {
 }
 
 // --- TRIANGLE RASTERIZATION TRAVERSAL LOOP ---
-void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_objects, Uint32* frame_buffer, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
+void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_objects, vec3 light_direction, Uint32* frame_buffer, float* z_buffer, Uint32 frame_width, Uint32 frame_height)
 {
     vec3* positions = world_objects->positions;
     Color* colors = world_objects->colors;
     vec2* uvs = world_objects->uvs;
+    vec3* normals = world_objects->normals;
 
     Triangle triangle = world_objects->triangles[triangle_index];
 
@@ -333,6 +318,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         .g = (float)colors[triangle.corner1_idx].g,
         .b = (float)colors[triangle.corner1_idx].b,
         .a = (float)colors[triangle.corner1_idx].a,
+        .nx = normals[triangle.corner1_idx][0],
+        .ny = normals[triangle.corner1_idx][1],
+        .nz = normals[triangle.corner1_idx][2],
     };
     Vertex v1 = {
         .x = positions[triangle.corner2_idx][0],
@@ -344,6 +332,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         .g = (float)colors[triangle.corner2_idx].g,
         .b = (float)colors[triangle.corner2_idx].b,
         .a = (float)colors[triangle.corner2_idx].a,
+        .nx = normals[triangle.corner2_idx][0],
+        .ny = normals[triangle.corner2_idx][1],
+        .nz = normals[triangle.corner2_idx][2],
     };
     Vertex v2 = {
         .x = positions[triangle.corner3_idx][0],
@@ -355,6 +346,9 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         .g = (float)colors[triangle.corner3_idx].g,
         .b = (float)colors[triangle.corner3_idx].b,
         .a = (float)colors[triangle.corner3_idx].a,
+        .nx = normals[triangle.corner3_idx][0],
+        .ny = normals[triangle.corner3_idx][1],
+        .nz = normals[triangle.corner3_idx][2],
     };
 
     const int has_texture =
@@ -394,6 +388,7 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
     // Declare placeholder gradients for texturing and color channels
     float du_dx = 0, du_dy = 0, dv_dx = 0, dv_dy = 0;
     float dr_dx = 0, dr_dy = 0, dg_dx = 0, dg_dy = 0, db_dx = 0, db_dy = 0;
+    float dnx_dx = 0, dnx_dy = 0, dny_dx = 0, dny_dy = 0, dnz_dx = 0, dnz_dy = 0;
 
     if (has_texture) {
         // Interpolation derivatives for Texture U coordinate
@@ -413,6 +408,13 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
         db_dx = ((v1.b - v0.b) * (v2.y - v0.y) - (v2.b - v0.b) * (v1.y - v0.y)) * inv_area;
         db_dy = ((v2.b - v0.b) * (v1.x - v0.x) - (v1.b - v0.b) * (v2.x - v0.x)) * inv_area;
     }
+
+    dnx_dx = ((v1.nx - v0.nx) * (v2.y - v0.y) - (v2.nx - v0.nx) * (v1.y - v0.y)) * inv_area;
+    dnx_dy = ((v2.nx - v0.nx) * (v1.x - v0.x) - (v1.nx - v0.nx) * (v2.x - v0.x)) * inv_area;
+    dny_dx = ((v1.ny - v0.ny) * (v2.y - v0.y) - (v2.ny - v0.ny) * (v1.y - v0.y)) * inv_area;
+    dny_dy = ((v2.ny - v0.ny) * (v1.x - v0.x) - (v1.ny - v0.ny) * (v2.x - v0.x)) * inv_area;
+    dnz_dx = ((v1.nz - v0.nz) * (v2.y - v0.y) - (v2.nz - v0.nz) * (v1.y - v0.y)) * inv_area;
+    dnz_dy = ((v2.nz - v0.nz) * (v1.x - v0.x) - (v1.nz - v0.nz) * (v2.x - v0.x)) * inv_area;
 
     // 4. Bounding Box Setup aligned perfectly to 4x2 block chunks
     int min_x = (min3((int)v0.x, (int)v1.x, (int)v2.x)) & ~3; // Round down to multiple of 4
@@ -449,6 +451,10 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
     __m256 vdr_dx = _mm256_set1_ps(dr_dx); __m256 vdr_dy = _mm256_set1_ps(dr_dy);
     __m256 vdg_dx = _mm256_set1_ps(dg_dx); __m256 vdg_dy = _mm256_set1_ps(dg_dy);
     __m256 vdb_dx = _mm256_set1_ps(db_dx); __m256 vdb_dy = _mm256_set1_ps(db_dy);
+
+    __m256 vdnx_dx = _mm256_set1_ps(dnx_dx); __m256 vdnx_dy = _mm256_set1_ps(dnx_dy);
+    __m256 vdny_dx = _mm256_set1_ps(dny_dx); __m256 vdny_dy = _mm256_set1_ps(dny_dy);
+    __m256 vdnz_dx = _mm256_set1_ps(dnz_dx); __m256 vdnz_dy = _mm256_set1_ps(dnz_dy);
 
     // Top-left evaluation coordinates tracking anchor position v0
     __m256 vv0_x = _mm256_set1_ps(v0.x);  __m256 vv0_y = _mm256_set1_ps(v0.y);
@@ -514,6 +520,18 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
 
             if (_mm256_movemask_ps(execution_mask) != 0) {
                 __m256i int_mask = _mm256_castps_si256(execution_mask);
+                
+                __m256 pixel_nx = _mm256_add_ps(_mm256_set1_ps(v0.nx), _mm256_add_ps(_mm256_mul_ps(dx, vdnx_dx), _mm256_mul_ps(dy, vdnx_dy)));
+                __m256 pixel_ny = _mm256_add_ps(_mm256_set1_ps(v0.ny), _mm256_add_ps(_mm256_mul_ps(dx, vdny_dx), _mm256_mul_ps(dy, vdny_dy)));
+                __m256 pixel_nz = _mm256_add_ps(_mm256_set1_ps(v0.nz), _mm256_add_ps(_mm256_mul_ps(dx, vdnz_dx), _mm256_mul_ps(dy, vdnz_dy)));
+
+                __m256 lighting = _mm256_add_ps(
+                    _mm256_mul_ps(pixel_nx, _mm256_set1_ps(light_direction[0])), _mm256_add_ps(
+                        _mm256_mul_ps(pixel_ny, _mm256_set1_ps(light_direction[1])), _mm256_mul_ps(pixel_nz, _mm256_set1_ps(light_direction[2]))
+                    )
+                );
+                lighting = _mm256_max_ps(_mm256_mul_ps(lighting, _mm256_set1_ps(-1.)), _mm256_set1_ps(0.));
+                ColorSIMD color_SIMD;
 
                 if (has_texture) {
                     // Interpolate the pre-projected homogenous attributes over screen space
@@ -522,53 +540,65 @@ void rasterize_triangle_bound_SIMD(Uint32 triangle_index, WorldObjects* world_ob
 
                     __m256 w_vec = _mm256_div_ps(_mm256_set1_ps(1.0f), z_vec);
 
-                    // Reconstruct perfect perspective-correct U and V coordinates for your texturing loop!
+                    // Reconstruct perspective-correct U and V coordinates for texturing loop
                     __m256 u_vec = _mm256_mul_ps(u_over_z_vec, w_vec);
                     __m256 v_vec = _mm256_mul_ps(v_over_z_vec, w_vec);
 
-                    // 5. Forward data vectors directly into the state-of-the-art Trilinear Texture Sampler
-                    process_rasterizer_block_4x2(x, y, frame_width, z_buffer, frame_buffer,
-                        int_mask, z_vec, u_vec, v_vec, &texture);
+                    // 5. Forward data vectors into Trilinear Texture Sampler
+                    color_SIMD = process_rasterizer_block_4x2(x, y, frame_width, z_buffer, frame_buffer,
+                        int_mask, z_vec, u_vec, v_vec, &texture, lighting);
                 }
                 else {
-                    __m256 final_R = _mm256_add_ps(_mm256_set1_ps(v0.r), _mm256_add_ps(_mm256_mul_ps(dx, vdr_dx), _mm256_mul_ps(dy, vdr_dy)));
-                    __m256 final_G = _mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy)));
-                    __m256 final_B = _mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy)));
+                    __m256 final_R = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.r), _mm256_add_ps(_mm256_mul_ps(dx, vdr_dx), _mm256_mul_ps(dy, vdr_dy))), lighting);
+                    __m256 final_G = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy))), lighting);
+                    __m256 final_B = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy))), lighting);
                     __m256 final_A = _mm256_set1_ps(v0.a);
-                    // Assuming constant position alpha for solid shading
-                    // Clamp float colors straight to [0.0f, 255.0f] range
-                    __m256 max_color = _mm256_set1_ps(255.0f);
-                    final_R = _mm256_min_ps(_mm256_max_ps(final_R, _mm256_setzero_ps()), max_color);
-                    final_G = _mm256_min_ps(_mm256_max_ps(final_G, _mm256_setzero_ps()), max_color);
-                    final_B = _mm256_min_ps(_mm256_max_ps(final_B, _mm256_setzero_ps()), max_color);
-                    // Convert colors to integers, pack channels into standard AABBGGRR pixel formats
-                    __m256i out_A = _mm256_cvtps_epi32(final_A);
-                    __m256i out_B = _mm256_slli_epi32(_mm256_cvtps_epi32(final_B), 8);
-                    __m256i out_G = _mm256_slli_epi32(_mm256_cvtps_epi32(final_G), 16);
-                    __m256i out_R = _mm256_slli_epi32(_mm256_cvtps_epi32(final_R), 24);
-                    __m256i packed_output = _mm256_or_si256(_mm256_or_si256(out_R, out_G), _mm256_or_si256(out_B, out_A));
-                    // Write out directly using masked operations
-                    // --- CORRECTED RESOLUTION STAGE: SPLIT BLOCKS INTO TWO 4-LANE ROWS ---
-                    // Extract row masks
-                    __m128i mask_row0 = _mm256_castsi256_si128(int_mask);
-                    __m128i mask_row1 = _mm256_extracti128_si256(int_mask, 1);
 
-                    // Extract row depth elements
-                    __m128 z_row0 = _mm256_castps256_ps128(z_vec);
-                    __m128 z_row1 = _mm256_extractf128_ps(z_vec, 1);
+                    color_SIMD = (ColorSIMD) {
+                        .r = _mm256_add_ps(_mm256_set1_ps(v0.r), _mm256_add_ps(_mm256_mul_ps(dx, vdr_dx), _mm256_mul_ps(dy, vdr_dy))),
+                            .g = _mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy))),
+                            .b = _mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy))),
+                            .a = _mm256_set1_ps(v0.a)
+                    };
 
-                    // Extract row color elements
-                    __m128i color_row0 = _mm256_castsi256_si128(packed_output);
-                    __m128i color_row1 = _mm256_extracti128_si256(packed_output, 1);
-
-                    // Write Row Y (Pixels 0, 1, 2, 3)
-                    _mm_maskstore_ps(z_buffer + (y * frame_width) + x, mask_row0, z_row0);
-                    _mm_maskstore_epi32((int*)(frame_buffer + (y * frame_width) + x), mask_row0, color_row0);
-
-                    // Write Row Y+1 (Pixels 4, 5, 6, 7)
-                    _mm_maskstore_ps(z_buffer + ((y + 1) * frame_width) + x, mask_row1, z_row1);
-                    _mm_maskstore_epi32((int*)(frame_buffer + ((y + 1) * frame_width) + x), mask_row1, color_row1);
                 }
+                color_SIMD.r = _mm256_mul_ps(color_SIMD.r, lighting);
+                color_SIMD.g = _mm256_mul_ps(color_SIMD.g, lighting);
+                color_SIMD.b = _mm256_mul_ps(color_SIMD.b, lighting);
+
+                // Assuming constant position alpha for solid shading
+                // Clamp float colors straight to [0.0f, 255.0f] range
+                __m256 max_color = _mm256_set1_ps(255.0f);
+                color_SIMD.r = _mm256_min_ps(_mm256_max_ps(color_SIMD.r, _mm256_setzero_ps()), max_color);
+                color_SIMD.g = _mm256_min_ps(_mm256_max_ps(color_SIMD.g, _mm256_setzero_ps()), max_color);
+                color_SIMD.b = _mm256_min_ps(_mm256_max_ps(color_SIMD.b, _mm256_setzero_ps()), max_color);
+                // Convert colors to integers, pack channels into standard AABBGGRR pixel formats
+                __m256i out_R = _mm256_slli_epi32(_mm256_cvtps_epi32(color_SIMD.r), 24);
+                __m256i out_G = _mm256_slli_epi32(_mm256_cvtps_epi32(color_SIMD.g), 16);
+                __m256i out_B = _mm256_slli_epi32(_mm256_cvtps_epi32(color_SIMD.b), 8);
+                __m256i out_A = _mm256_cvtps_epi32(color_SIMD.a);
+                __m256i packed_output = _mm256_or_si256(_mm256_or_si256(out_R, out_G), _mm256_or_si256(out_B, out_A));
+                // Write out directly using masked operations
+                // --- CORRECTED RESOLUTION STAGE: SPLIT BLOCKS INTO TWO 4-LANE ROWS ---
+                // Extract row masks
+                __m128i mask_row0 = _mm256_castsi256_si128(int_mask);
+                __m128i mask_row1 = _mm256_extracti128_si256(int_mask, 1);
+
+                // Extract row depth elements
+                __m128 z_row0 = _mm256_castps256_ps128(z_vec);
+                __m128 z_row1 = _mm256_extractf128_ps(z_vec, 1);
+
+                // Extract row color elements
+                __m128i color_row0 = _mm256_castsi256_si128(packed_output);
+                __m128i color_row1 = _mm256_extracti128_si256(packed_output, 1);
+
+                // Write Row Y (Pixels 0, 1, 2, 3)
+                _mm_maskstore_ps(z_buffer + (y * frame_width) + x, mask_row0, z_row0);
+                _mm_maskstore_epi32((int*)(frame_buffer + (y * frame_width) + x), mask_row0, color_row0);
+
+                // Write Row Y+1 (Pixels 4, 5, 6, 7)
+                _mm_maskstore_ps(z_buffer + ((y + 1) * frame_width) + x, mask_row1, z_row1);
+                _mm_maskstore_epi32((int*)(frame_buffer + ((y + 1) * frame_width) + x), mask_row1, color_row1);
             }
         }
     }
@@ -589,8 +619,8 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_wid
 	memset(z_buffer, 0, sizeof(float) * frame_width * frame_height);
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-        //rasterize_triangle_bound_SIMD(i, on_screen_objects, frame, z_buffer, frame_width, frame_height);
-		_draw_triangle(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
+        rasterize_triangle_bound_SIMD(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
+		//_draw_triangle(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
 	}
 }
 
