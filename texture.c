@@ -473,8 +473,7 @@ static inline Uint32 _clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value
 // THE UNIFIED BLOCK EXECUTION LOOP ENTRYPOINT
 ColorSIMD texture_sample_trilinear_SIMD(int x, int y, int screen_width, float* depth_buffer, uint32_t* frame_buffer,
     __m256i int_mask, __m256 z_vec,
-    __m256 u_vec, __m256 v_vec, TiledTexture* texture,
-    __m256 lighting)
+    __m256 u_vec, __m256 v_vec, TiledTexture* texture)
 {
     // --- STAGE 1: PARALLEL QUAD DERIVATIVES & ANISOTROPIC FOOTPRINT ---
     // Scale normalized values up to Base Mip level dimensions

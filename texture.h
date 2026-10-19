@@ -58,5 +58,5 @@ static __m256i _bit_interleave_SIMD(__m256i x);
 static void _unpack_rgba_to_float_soa_SIMD(__m256i packed_rgba, __m256* r, __m256* g, __m256* b, __m256* a);
 static __m256 _bilinear_filter_channel_SIMD(__m256 tl, __m256 tr, __m256 bl, __m256 br, __m256 alpha, __m256 beta);
 static void _sample_mip_level_soa_SIMD(const Color* mip_ptr, Uint32 width_in_tiles, __m256i u0, __m256i v0, __m256i tex_w_mask, __m256i tex_h_mask, __m256i int_mask, __m256 alpha, __m256 beta, __m256* out_R, __m256* out_G, __m256* out_B, __m256* out_A);
-ColorSIMD texture_sample_trilinear_SIMD(int x, int y, int screen_width, float* depth_buffer, uint32_t* frame_buffer, __m256i int_mask, __m256 z_vec, __m256 u_vec, __m256 v_vec, TiledTexture* texture, __m256 lighting);
+ColorSIMD texture_sample_trilinear_SIMD(int x, int y, int screen_width, float* depth_buffer, uint32_t* frame_buffer, __m256i int_mask, __m256 z_vec, __m256 u_vec, __m256 v_vec, TiledTexture* texture);
 

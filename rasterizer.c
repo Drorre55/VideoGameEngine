@@ -275,14 +275,9 @@ static inline void _draw_triangle_SIMD(Uint32 triangle_index, WorldObjects* worl
 
                     // 5. Forward data vectors into Trilinear Texture Sampler
                     color_SIMD = texture_sample_trilinear_SIMD(x, y, frame_width, z_buffer, frame_buffer,
-                        int_mask, z_vec, u_vec, v_vec, &texture, lighting);
+                        int_mask, z_vec, u_vec, v_vec, &texture);
                 }
                 else {
-                    __m256 final_R = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.r), _mm256_add_ps(_mm256_mul_ps(dx, vdr_dx), _mm256_mul_ps(dy, vdr_dy))), lighting);
-                    __m256 final_G = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy))), lighting);
-                    __m256 final_B = _mm256_mul_ps(_mm256_add_ps(_mm256_set1_ps(v0.b), _mm256_add_ps(_mm256_mul_ps(dx, vdb_dx), _mm256_mul_ps(dy, vdb_dy))), lighting);
-                    __m256 final_A = _mm256_set1_ps(v0.a);
-
                     color_SIMD = (ColorSIMD){
                         .r = _mm256_add_ps(_mm256_set1_ps(v0.r), _mm256_add_ps(_mm256_mul_ps(dx, vdr_dx), _mm256_mul_ps(dy, vdr_dy))),
                             .g = _mm256_add_ps(_mm256_set1_ps(v0.g), _mm256_add_ps(_mm256_mul_ps(dx, vdg_dx), _mm256_mul_ps(dy, vdg_dy))),

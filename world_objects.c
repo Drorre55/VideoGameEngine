@@ -207,7 +207,7 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     }
     // Set fallback to red
     for (Uint32 i = 0; i < total_vertices; i++) {
-        //obj->colors[i] = (Color){ 150, 0, 0, 255 };
+        obj->colors[i] = (Color){ 0, 0, 0, 255 };
         /*obj->colors[i].r = obj->uvs[i][0] * 255;
         obj->colors[i].g = obj->uvs[i][1] * 255;*/
         obj->colors[i].g = (Uint8)(_normalize_to_01(obj->positions[i][1] + 100., 200.) * 255.);
