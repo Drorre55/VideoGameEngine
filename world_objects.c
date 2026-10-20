@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 5, 10.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 1, 5.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -99,11 +99,11 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     }
 
     Uint32 perlin_starting_octave = 3;
-    Uint8 perlin_num_octaves = 4;
+    Uint8 perlin_num_octaves = 8;
+    vec2* perlin_octaves_gradients[8];
     float perlin_multiplier = 2.;
     float perlin_normal_divider = 2. * radius;
     
-    vec2* perlin_octaves_gradients[4];
     Uint32 perlin_gradients_current_octave = perlin_starting_octave;
     for (Uint32 i = 0; i < perlin_num_octaves; i++) {
         perlin_octaves_gradients[i] = perlin_gradients(perlin_gradients_current_octave, 42);
@@ -129,28 +129,26 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
         vec2 position2d = { (float)obj->positions[bottom_idx][0], (float)obj->positions[bottom_idx][2] };
         glm_vec2_add(position2d, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-        normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
-        normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
+        glm_vec2_clamp(normalized_point, 0., 1.);
 
         _sum_perlin_octaves(obj, bottom_idx, normalized_point, perlin_octaves_gradients, perlin_starting_octave, 
             perlin_num_octaves, perlin_multiplier, perlin_normal_divider);
-
-        obj->uvs[bottom_idx][0] = _normalize_to_01(obj->positions[bottom_idx][0], (2.f * texture_tile_radius));
-        obj->uvs[bottom_idx][1] = _normalize_to_01(obj->positions[bottom_idx][2], (2.f * texture_tile_radius));
+        
+        obj->uvs[bottom_idx][0] = obj->positions[bottom_idx][0] / (2.f * texture_tile_radius);
+        obj->uvs[bottom_idx][1] = obj->positions[bottom_idx][2] / (2.f * texture_tile_radius);
         
         Uint32 top_idx = bottom_idx + 1;
         glm_vec3_copy(current_top, obj->positions[top_idx]);
         vec2 position2d_next = { (float)obj->positions[top_idx][0], (float)obj->positions[top_idx][2] };
         glm_vec2_add(position2d_next, max_bounds, normalize_numerator);
         glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-        normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
-        normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
+        glm_vec2_clamp(normalized_point, 0., 1.);
 
         _sum_perlin_octaves(obj, top_idx, normalized_point, perlin_octaves_gradients, perlin_starting_octave,
             perlin_num_octaves, perlin_multiplier, perlin_normal_divider);
 
-        obj->uvs[top_idx][0] = _normalize_to_01(obj->positions[top_idx][0], (2.0 * texture_tile_radius));
-        obj->uvs[top_idx][1] = _normalize_to_01(obj->positions[top_idx][2], (2.0 * texture_tile_radius));
+        obj->uvs[top_idx][0] = obj->positions[top_idx][0] / (2.f * texture_tile_radius);
+        obj->uvs[top_idx][1] = obj->positions[top_idx][2] / (2.f * texture_tile_radius);
 
         glm_vec3_add(current_bottom, right_step, current_bottom);
         glm_vec3_add(current_top, right_step, current_top);
@@ -172,14 +170,13 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
             vec2 position2d = { (float)obj->positions[top_idx][0], (float)obj->positions[top_idx][2] };
             glm_vec2_add(position2d, max_bounds, normalize_numerator);
             glm_vec2_div(normalize_numerator, normalize_denominator, normalized_point);
-            normalized_point[0] = fminf(normalized_point[0], 1.0f - 1e-6f);
-            normalized_point[1] = fminf(normalized_point[1], 1.0f - 1e-6f);
+            glm_vec2_clamp(normalized_point, 0., 1.);
 
             _sum_perlin_octaves(obj, top_idx, normalized_point, perlin_octaves_gradients, perlin_starting_octave,
                 perlin_num_octaves, perlin_multiplier, perlin_normal_divider);
 
-            obj->uvs[top_idx][0] = _normalize_to_01(obj->positions[top_idx][0], (2.f * texture_tile_radius));
-            obj->uvs[top_idx][1] = _normalize_to_01(obj->positions[top_idx][2], (2.f * texture_tile_radius));
+            obj->uvs[top_idx][0] = obj->positions[top_idx][0] / (2.f * texture_tile_radius);
+            obj->uvs[top_idx][1] = obj->positions[top_idx][2] / (2.f * texture_tile_radius);
 
             glm_vec3_add(current_top, right_step, current_top);
         }
@@ -207,10 +204,7 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     }
     // Set fallback to red
     for (Uint32 i = 0; i < total_vertices; i++) {
-        obj->colors[i] = (Color){ 0, 0, 0, 255 };
-        /*obj->colors[i].r = obj->uvs[i][0] * 255;
-        obj->colors[i].g = obj->uvs[i][1] * 255;*/
-        obj->colors[i].g = (Uint8)(_normalize_to_01(obj->positions[i][1] + 100., 200.) * 255.);
+        obj->colors[i] = (Color){ 0, 150, 0, 255 };
     }
     return obj;
 }
@@ -240,10 +234,6 @@ static inline void _sum_perlin_octaves(WorldObjects* obj, Uint32 idx, vec2 norma
     obj->normals[idx][2] = -derivative[1];
 
     glm_vec3_normalize(obj->normals[idx]);
-}
-
-static inline float _normalize_to_01(float a, float b) {
-    return (a - b * floorf(a / b)) / b;
 }
 
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects)

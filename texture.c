@@ -370,8 +370,12 @@ static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float
 
     Uint32 row0 = (Uint32)floorf(row);
     Uint32 col0 = (Uint32)floorf(col);
-    Uint32 row1 = _clamp_u32(row0 + 1, 0, mipmap.height - 1);
-    Uint32 col1 = _clamp_u32(col0 + 1, 0, mipmap.width - 1);
+
+    Uint32 row1 = (row0 + 1) % mipmap.height;
+    Uint32 col1 = (col0 + 1) % mipmap.width;
+
+    row0 %= mipmap.height;
+    col0 %= mipmap.width;
 
     float t_row = row - (float)row0;
     float t_col = col - (float)col0;
