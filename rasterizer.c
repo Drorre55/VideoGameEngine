@@ -22,8 +22,8 @@ void rasterize_objects_to_frame(Uint32* frame, float* z_buffer, Uint32 frame_wid
 	memset(z_buffer, 0, sizeof(float) * frame_width * frame_height);
 
 	for (int i = 0; i < on_screen_objects->num_triangles; i++) {
-        _draw_triangle_SIMD(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
-		//_draw_triangle_legacy(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
+        //_draw_triangle_SIMD(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
+		_draw_triangle_legacy(i, on_screen_objects, light_direction, frame, z_buffer, frame_width, frame_height);
 	}
 }
 
@@ -532,6 +532,12 @@ static void _draw_triangle_legacy(Uint32 triangle_index, WorldObjects* world_obj
 
                         if (interpolated_depth > z_buffer[pixel_idx]) {
                             z_buffer[pixel_idx] = interpolated_depth;
+                            
+                            vec3 pixel_normal;
+                            pixel_normal[0] = (*C_normal)[0] + Anormal_minus_C[0] * wA + Bnormal_minus_C[0] * wB;
+                            pixel_normal[1] = (*C_normal)[1] + Anormal_minus_C[1] * wA + Bnormal_minus_C[1] * wB;
+                            pixel_normal[2] = (*C_normal)[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
+                            glm_vec3_normalize(pixel_normal);
 
                             Color final_color = { .r = 0, .g = 0, .r = 0, .a = 255 };
                             if (has_texture) {
@@ -545,7 +551,12 @@ static void _draw_triangle_legacy(Uint32 triangle_index, WorldObjects* world_obj
                                 glm_vec2_scale(duv_dy, z, scaled_duv_dy);
 
                                 // Invoke your trilinear sampler pipeline cleanly
-                                final_color = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
+                                Material material = texture_sample_trilinear(texture, u, v, scaled_duv_dx, scaled_duv_dy);
+                                final_color = material.color;
+                                pixel_normal[0] += material.normal[0];
+                                pixel_normal[1] += material.normal[1];
+                                pixel_normal[2] += material.normal[2];
+                                glm_vec3_normalize(pixel_normal);
                             }
                             else {
                                 // Correctly index into your vec4 cglm color arrays [0]=R, [1]=G, [2]=B
@@ -565,16 +576,11 @@ static void _draw_triangle_legacy(Uint32 triangle_index, WorldObjects* world_obj
                                     .a = 255
                                 };
                             }
-                            vec3 pixel_normal;
-                            pixel_normal[0] = (*C_normal)[0] + Anormal_minus_C[0] * wA + Bnormal_minus_C[0] * wB;
-                            pixel_normal[1] = (*C_normal)[1] + Anormal_minus_C[1] * wA + Bnormal_minus_C[1] * wB;
-                            pixel_normal[2] = (*C_normal)[2] + Anormal_minus_C[2] * wA + Bnormal_minus_C[2] * wB;
-
-                            glm_vec3_normalize(pixel_normal);
                             float lighting = glm_clamp_zo(glm_vec3_dot(light_direction, pixel_normal));
+                            final_color.r = (Uint8)((float)final_color.r * lighting);
                             final_color.g = (Uint8)((float)final_color.g * lighting);
                             final_color.b = (Uint8)((float)final_color.b * lighting);
-                            final_color.r = (Uint8)((float)final_color.r * lighting);
+                            final_color.a = 255;
 
                             frame[pixel_idx] = _color_to_uint32(final_color);
                         }

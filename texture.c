@@ -1,6 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "texture.h"
 #include "stb_image.h"
+#include "exr_loader.h"
 #include <string.h>
 #include <immintrin.h>
 
@@ -19,7 +20,7 @@ static const uint8_t MORTON_LUT[8][8] = {
 
 // Looks up a pixel color inside a specific mipmap level.
 // This function bypasses linear memory rules entirely.
-static inline Color _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32 col) {
+static inline Material _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32 col) {
     // 1. Isolate the tile coordinate vs the pixel position inside that tile
     Uint32 tile_row = row >> TILE_WIDTH_BITS; // row / TILE_WIDTH
     Uint32 tile_col = col >> TILE_WIDTH_BITS; // col / TILE_WIDTH
@@ -38,7 +39,46 @@ static inline Color _sample_tiled_pixel(const Mipmap* mipmap, Uint32 row, Uint32
     return mipmap->pixels[tile_offset + local_morton_index];
 }
 
-TiledTexture create_tiled_texture(uint32_t width, uint32_t height) {
+TiledTexture texture_load_from_file(const char* color_filepath, const char* normal_filepath)
+{
+    TiledTexture texture = { 0 };
+    if (!color_filepath) 
+        return texture;
+    
+    int width = 0;
+    int height = 0;
+    int placeholder = 0;
+    
+    // Force RGBA so renderer uses a consistent format.
+    Color* colors = stbi_load(color_filepath, &width, &height, &placeholder, 4);
+
+    if (!colors) {
+        SDL_LogError(1, "Failed to load texture: %s", color_filepath);
+        return texture;
+    }
+
+    const char* err = NULL;
+    vec3* normals = NULL;
+    if (normal_filepath) {
+        int normal_width, normal_height;
+        normals = load_exr_normals(normal_filepath, &normal_width, &normal_height,
+            /*encoded_01=*/0, /*flip_v=*/0);
+        if (!normals) {
+            normals = NULL;
+        }
+        else if (width != normal_width || height != normal_height) {
+            free(normals);
+            normals = NULL;
+        }
+    }
+    texture = _create_tiled_texture(width, height);
+    _populate_mipmap(texture.mipmaps[0], colors, normals, width);
+    _generate_sub_mipmaps(texture);
+
+    return texture;
+}
+
+static TiledTexture _create_tiled_texture(uint32_t width, uint32_t height) {
     TiledTexture texture = { 0 };
 
     // Calculate total required pixels across all mips
@@ -62,10 +102,10 @@ TiledTexture create_tiled_texture(uint32_t width, uint32_t height) {
     texture.mipmaps = malloc(num_levels * sizeof(Mipmap));
 
     // 64-byte aligned allocation for optimal CPU cache line alignment
-    texture.contiguous_buffer = (Color*)_aligned_malloc(total_pixels * sizeof(Color), 64);
+    texture.contiguous_buffer = (Material*)_aligned_malloc(total_pixels * sizeof(Material), 64);
 
     // Assign pointers inside the flat pool
-    Color* current_ptr = texture.contiguous_buffer;
+    Material* current_ptr = texture.contiguous_buffer;
     mipmap_width = width; mipmap_height = height;
     for (Uint32 i = 0; i < num_levels; i++) {
         Uint32 padded_w = ((mipmap_width + TILE_WIDTH - 1) & ~(TILE_WIDTH - 1));
@@ -84,16 +124,14 @@ TiledTexture create_tiled_texture(uint32_t width, uint32_t height) {
     return texture;
 }
 
-/**
- * Converts a flat, row-major linear Color buffer
- * into our highly optimized Tiled / Morton structure for Mip 0.
- */
-static void _populate_mipmap(Mipmap mipmap, const Color* linear_input, Uint32 width) {
+// Converts a flat, row-major linear Material buffers into Tiled / Morton structure for Mip 0.
+static void _populate_mipmap(Mipmap mipmap, const Color* colors, const vec3* normals, Uint32 width) {
     // Walk through the linear source dimensions
     for (Uint32 row = 0; row < width; row++) {
         for (Uint32 col = 0; col < width; col++) {
             // Read linear pixel
-            Color pixel_color = linear_input[row * width + col];
+            Color pixel_color = colors[row * width + col];
+            vec3* pixel_normal = normals[row * width + col];
 
             // Calculate where it belongs in our tiled architecture
             Uint32 tile_row = row >> TILE_WIDTH_BITS;
@@ -106,34 +144,19 @@ static void _populate_mipmap(Mipmap mipmap, const Color* linear_input, Uint32 wi
             Uint32 local_morton = MORTON_LUT[pixel_row][pixel_col];
 
             // Write to the contiguous tiled pool
-            mipmap.pixels[tile_offset + local_morton] = pixel_color;
+            mipmap.pixels[tile_offset + local_morton].color = pixel_color;
+            if (!(normals[0])) {
+                mipmap.pixels[tile_offset + local_morton].normal[0] = 0.;
+                mipmap.pixels[tile_offset + local_morton].normal[1] = 0.;
+                mipmap.pixels[tile_offset + local_morton].normal[2] = 0.;
+            }
+            else {
+                mipmap.pixels[tile_offset + local_morton].normal[0] = *pixel_normal[0];
+                mipmap.pixels[tile_offset + local_morton].normal[1] = *pixel_normal[1];
+                mipmap.pixels[tile_offset + local_morton].normal[2] = *pixel_normal[2];
+            }
         }
     }
-}
-
-TiledTexture texture_load_from_file(const char* filepath)
-{
-    TiledTexture texture = { 0 };
-    if (!filepath) 
-        return texture;
-    
-    int width = 0;
-    int height = 0;
-    int placeholder = 0;
-    
-    // Force RGBA so renderer uses a consistent format.
-    Color* pixels = stbi_load(filepath, &width, &height, &placeholder, 4);
-
-    if (!pixels) {
-        SDL_LogError(1, "Failed to load texture: %s", filepath);
-        return texture;
-    }
-
-    texture = create_tiled_texture(width, height);
-    _populate_mipmap(texture.mipmaps[0], pixels, width);
-    _generate_sub_mipmaps(texture);
-
-    return texture;
 }
 
 // We assume square image in the power of 2
@@ -151,6 +174,10 @@ static void _generate_sub_mipmaps(TiledTexture texture) {
                 float sum_g = 0.f;
                 float sum_b = 0.f;
                 float sum_a = 0.f;
+                
+                float sum_nx = 0.f;
+                float sum_ny = 0.f;
+                float sum_nz = 0.f;
 
                 // Map target (row,col) to the bounding box anchor in Mip 0
                 Uint32 original_start_row = row * kernel_width;
@@ -161,19 +188,29 @@ static void _generate_sub_mipmaps(TiledTexture texture) {
                         Uint32 original_row = original_start_row + kernel_row;
                         Uint32 original_col = original_start_col + kernel_col;
 
-                        Color original_pixel = _sample_tiled_pixel(&original_image, original_row, original_col);
-                        sum_r += (float)original_pixel.r;
-                        sum_g += (float)original_pixel.g;
-                        sum_b += (float)original_pixel.b;
-                        sum_a += (float)original_pixel.a;
+                        Material original_pixel = _sample_tiled_pixel(&original_image, original_row, original_col);
+                        sum_r += (float)original_pixel.color.r;
+                        sum_g += (float)original_pixel.color.g;
+                        sum_b += (float)original_pixel.color.b;
+                        sum_a += (float)original_pixel.color.a;
+
+                        sum_nx += original_pixel.normal[0];
+                        sum_ny += original_pixel.normal[1];
+                        sum_nz += original_pixel.normal[2];
                     }
                 }
-                Color average_color = {
-                    .r = (Uint8)(sum_r / kernel_size),
-                    .g = (Uint8)(sum_g / kernel_size),
-                    .b = (Uint8)(sum_b / kernel_size),
-                    .a = (Uint8)(sum_a / kernel_size)
+                Material average = {
+                    .color.r = (Uint8)(sum_r / kernel_size),
+                    .color.g = (Uint8)(sum_g / kernel_size),
+                    .color.b = (Uint8)(sum_b / kernel_size),
+                    .color.a = (Uint8)(sum_a / kernel_size),
+                    .normal = {
+                        (sum_nx / kernel_size),
+                        (sum_ny / kernel_size),
+                        (sum_nz / kernel_size)
+                    }
                 };
+                glm_vec3_normalize(average.normal);
                 // Compute destination tile parameters
                 Uint32 mipmap_tile_row = row >> TILE_WIDTH_BITS;
                 Uint32 mipmap_tile_col = col >> TILE_WIDTH_BITS;
@@ -184,7 +221,7 @@ static void _generate_sub_mipmaps(TiledTexture texture) {
                 uint32_t mipmap_tile_offset = mipmap_tile_idx * TILE_PIXELS;
                 uint32_t mipmap_morton = MORTON_LUT[mipmap_pixel_row][mipmap_pixel_col];
 
-                mipmap.pixels[mipmap_tile_offset + mipmap_morton] = average_color;
+                mipmap.pixels[mipmap_tile_offset + mipmap_morton] = average;
             }
         }
     }
@@ -256,16 +293,16 @@ TiledTexture texture_clone(const TiledTexture src)
     for (Uint8 i = 0; i < src.num_levels; i++)
         total_pixels += _mipmap_padded_size(src.mipmaps[i]);
 
-    copy.contiguous_buffer = (Color*)_aligned_malloc(total_pixels * sizeof(Color), 64);
+    copy.contiguous_buffer = (Material*)_aligned_malloc(total_pixels * sizeof(Material), 64);
     if (!copy.contiguous_buffer) {
         free(copy.mipmaps);
         copy.mipmaps = NULL;
         copy.num_levels = 0;
         return copy;
     }
-    memcpy(copy.contiguous_buffer, src.contiguous_buffer, total_pixels * sizeof(Color));
+    memcpy(copy.contiguous_buffer, src.contiguous_buffer, total_pixels * sizeof(Material));
 
-    Color* cursor = copy.contiguous_buffer;
+    Material* cursor = copy.contiguous_buffer;
     for (Uint8 i = 0; i < src.num_levels; i++) {
         copy.mipmaps[i].width = src.mipmaps[i].width;
         copy.mipmaps[i].height = src.mipmaps[i].height;
@@ -315,9 +352,9 @@ Uint32 texture_bank_add(TextureBank* bank, TiledTexture mipmap) {
     return bank->count - 1;
 }
 
-Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath)
+Uint32 texture_bank_add_from_file(TextureBank* bank, const char* color_filepath, const char* normal_filepath)
 {
-    TiledTexture texture = texture_load_from_file(filepath);
+    TiledTexture texture = texture_load_from_file(color_filepath, normal_filepath);
     if (texture.num_levels == 0) {
         return TEXTURE_NONE;
     }
@@ -355,12 +392,12 @@ Color texture_sample_nearest(const Mipmap mipmap, float u, float v)
     return pixel;
 }
 
-static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float v)
+static inline Material _texture_sample_bilinear(const Mipmap mipmap, float u, float v)
 {
-    Color pixel = { 0, 0, 0, 255 };
+    Material out_material = { 0 };
 
     if (!mipmap.pixels || mipmap.width == 0 || mipmap.height == 0)
-        return pixel;
+        return out_material;
 
     float uu = u - floorf(u);
     float vv = v - floorf(v);
@@ -380,50 +417,76 @@ static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float
     float t_row = row - (float)row0;
     float t_col = col - (float)col0;
     
-    Color pixel00 = _sample_tiled_pixel(&mipmap, row0, col0);
-    Color pixel01 = _sample_tiled_pixel(&mipmap, row0, col1);
-    Color pixel10 = _sample_tiled_pixel(&mipmap, row1, col0);
-    Color pixel11 = _sample_tiled_pixel(&mipmap, row1, col1);
+    Material pixel00 = _sample_tiled_pixel(&mipmap, row0, col0);
+    Material pixel01 = _sample_tiled_pixel(&mipmap, row0, col1);
+    Material pixel10 = _sample_tiled_pixel(&mipmap, row1, col0);
+    Material pixel11 = _sample_tiled_pixel(&mipmap, row1, col1);
 
     // 3. Convert 8-bit RGBA channels to 32-bit floats inside SIMD registers
     // We unpack the bytes into floats so we can do precise blending math
-    __m128 v_p00 = _mm_set_ps((float)pixel00.a, (float)pixel00.b, (float)pixel00.g, (float)pixel00.r);
-    __m128 v_p01 = _mm_set_ps((float)pixel01.a, (float)pixel01.b, (float)pixel01.g, (float)pixel01.r);
-    __m128 v_p10 = _mm_set_ps((float)pixel10.a, (float)pixel10.b, (float)pixel10.g, (float)pixel10.r);
-    __m128 v_p11 = _mm_set_ps((float)pixel11.a, (float)pixel11.b, (float)pixel11.g, (float)pixel11.r);
+    __m256 v_p00 = _mm256_setr_ps((float)pixel00.color.r, (float)pixel00.color.g, (float)pixel00.color.b, (float)pixel00.color.a, pixel00.normal[0], pixel00.normal[1], pixel00.normal[2], 0.);
+    __m256 v_p01 = _mm256_setr_ps((float)pixel01.color.r, (float)pixel01.color.g, (float)pixel01.color.b, (float)pixel01.color.a, pixel01.normal[0], pixel01.normal[1], pixel01.normal[2], 0.);
+    __m256 v_p10 = _mm256_setr_ps((float)pixel10.color.r, (float)pixel10.color.g, (float)pixel10.color.b, (float)pixel10.color.a, pixel10.normal[0], pixel10.normal[1], pixel10.normal[2], 0.);
+    __m256 v_p11 = _mm256_setr_ps((float)pixel11.color.r, (float)pixel11.color.g, (float)pixel11.color.b, (float)pixel11.color.a, pixel11.normal[0], pixel11.normal[1], pixel11.normal[2], 0.);
 
     // 4. Setup interpolation weights as vector constants
-    __m128 v_t_col = _mm_set1_ps(t_col);
-    __m128 v_t_row = _mm_set1_ps(t_row);
+    __m256 v_t_col = _mm256_set1_ps(t_col);
+    __m256 v_t_row = _mm256_set1_ps(t_row);
 
     // 5. Perform Vectorized LERP across columns for all 4 channels at once
     // Formula: mixed = start + t * (end - start)
-    __m128 v_m0 = _mm_add_ps(v_p00, _mm_mul_ps(v_t_col, _mm_sub_ps(v_p01, v_p00))); // Top row LERP
-    __m128 v_m1 = _mm_add_ps(v_p10, _mm_mul_ps(v_t_col, _mm_sub_ps(v_p11, v_p10))); // Bottom row LERP
+    __m256 v_m0 = _mm256_add_ps(v_p00, _mm256_mul_ps(v_t_col, _mm256_sub_ps(v_p01, v_p00))); // Top row LERP
+    __m256 v_m1 = _mm256_add_ps(v_p10, _mm256_mul_ps(v_t_col, _mm256_sub_ps(v_p11, v_p10))); // Bottom row LERP
 
     // 6. Perform Vectorized LERP vertically between rows
-    __m128 v_final = _mm_add_ps(v_m0, _mm_mul_ps(v_t_row, _mm_sub_ps(v_m1, v_m0)));
+    __m256 v_final = _mm256_add_ps(v_m0, _mm256_mul_ps(v_t_row, _mm256_sub_ps(v_m1, v_m0)));
 
     /// --- THE REGISTER OPTIMIZATION FIX ---
-    // 1. Direct float-to-int32 conversions entirely within vector pipelines
-    __m128i v_int = _mm_cvtps_epi32(v_final);
+    // 1. Extract f4, f5, f6, f7 to 
+    __m128 first_floats = _mm256_extractf128_ps(v_final, 1);
+
+    // 2. Extract and convert f0, f1, f2, f3 to 32-bit integers
+    __m128 last_floats = _mm256_castps256_ps128(v_final);
+    __m128i v_int = _mm_cvtps_epi32(last_floats);
 
     // 2. Compress four 32-bit integers down to 8-bit bytes inside a single register
-    v_int = _mm_packus_epi32(v_int, v_int); // Down to 16-bit elements
-    v_int = _mm_packus_epi16(v_int, v_int); // Down to contiguous 8-bit RGBA channels
+    __m128i ints16 = _mm_packus_epi32(v_int, _mm_setzero_si128()); // Down to 16-bit elements
+    __m128i bytes8 = _mm_packus_epi16(ints16, _mm_setzero_si128()); // Down to contiguous 8-bit RGBA channels
 
-    // --- MSVC ALIASING FIX ---
-    // A union guarantees MSVC returns the raw 32-bit register directly
+    //// 4. Combine bytes8 (4 bytes) and first_floats (12 bytes of interest) into one register
+    //// We want the final 128-bit register to look like: [ f6, f5, f4 | b3, b2, b1, b0 ]
+    //// Shifting first_floats left by 4 bytes (32 bits) inserts zeros in the lowest slot
+    //__m128i upper_as_int = _mm_castps_si128(first_floats);
+    //__m128i shifted_ints = _mm_bslli_si128(upper_as_int, 4);      // [ f6, f5, f4, 0x00000000 ]
+
+    //// 5. Bitwise OR them together to combine color bytes and normals
+    //__m128i final_payload = _mm_or_si128(shifted_ints, bytes8);
+
+    //// 6. 16-byte single store directly into the struct
+    //_mm_storeu_ps((float*)&padded_material, _mm_castsi128_ps(final_payload));
+
+
+    // Extract the lower 32 bits (4 bytes) and copy directly to the Color union
     union {
         Uint32 raw;
         Color color;
-    } result;
+    } result_color;
+    result_color.raw = (Uint32)_mm_cvtsi128_si32(bytes8);
+    out_material.color = result_color.color;
 
-    result.raw = (Uint32)_mm_cvtsi128_si32(v_int);
-    return result.color;
+    // 3. Store the 3 normal floats safely
+    // A standard 128-bit store (_mm_storeu_ps) writes 16 bytes, which would 
+    // overshoot your 12-byte vec3 and cause memory corruption.
+    // Instead, store 8 bytes (X and Y), then the remaining 4 bytes (Z).
+    _mm_storeu_si64((__m128i*)(out_material.normal), _mm_castps_si128(first_floats));
+
+    // Extract lane 2 (Z) and write it down
+    out_material.normal[2] = _mm_cvtss_f32(_mm_shuffle_ps(first_floats, first_floats, _MM_SHUFFLE(2, 2, 2, 2)));
+    glm_vec3_normalize(out_material.normal);
+    return out_material;
 }
 
-Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
+Material texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy)
 {
     Mipmap original_image = texture.mipmaps[0];
 
@@ -453,16 +516,20 @@ Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec
     if (low_mipmap == high_mipmap)
         return _texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
     
-    Color low_mipmap_color = _texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
-    Color high_mipmap_color = _texture_sample_bilinear(texture.mipmaps[high_mipmap], u, v);
-
-    Color pixel = { 0, 0, 0, 255 };
+    Material low_mipmap_material = _texture_sample_bilinear(texture.mipmaps[low_mipmap], u, v);
+    Material high_mipmap_material = _texture_sample_bilinear(texture.mipmaps[high_mipmap], u, v);
 
     float t = lod - low_mipmap;
-    pixel.r = (Uint8)glm_lerp(low_mipmap_color.r, high_mipmap_color.r, t);
-    pixel.g = (Uint8)glm_lerp(low_mipmap_color.g, high_mipmap_color.g, t);
-    pixel.b = (Uint8)glm_lerp(low_mipmap_color.b, high_mipmap_color.b, t);
-    pixel.a = (Uint8)glm_lerp(low_mipmap_color.a, high_mipmap_color.a, t);
+    Material pixel = { 
+        .color.r = (Uint8)glm_lerp(low_mipmap_material.color.r, high_mipmap_material.color.r, t),
+        .color.g = (Uint8)glm_lerp(low_mipmap_material.color.g, high_mipmap_material.color.g, t),
+        .color.b = (Uint8)glm_lerp(low_mipmap_material.color.b, high_mipmap_material.color.b, t),
+        .color.a = (Uint8)glm_lerp(low_mipmap_material.color.a, high_mipmap_material.color.a, t),
+        .normal[0] = glm_lerp(low_mipmap_material.normal[0], high_mipmap_material.normal[0], t),
+        .normal[1] = glm_lerp(low_mipmap_material.normal[1], high_mipmap_material.normal[1], t),
+        .normal[2] = glm_lerp(low_mipmap_material.normal[2], high_mipmap_material.normal[2], t),
+    };
+    glm_vec3_normalize(pixel.normal);
 
     return pixel;
 }

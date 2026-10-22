@@ -76,17 +76,19 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)libraries\tinyexr-release\deps\miniz;$(ProjectDir)libraries\tinyexr-release;$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -97,16 +99,18 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)libraries\tinyexr-release\deps\miniz;$(ProjectDir)libraries\tinyexr-release;$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <Optimization>MaxSpeed</Optimization>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -115,18 +119,20 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)libraries\tinyexr-release\deps\miniz;$(ProjectDir)libraries\tinyexr-release;$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <OmitFramePointers>false</OmitFramePointers>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -137,23 +143,26 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)libraries\tinyexr-release\deps\miniz;$(ProjectDir)libraries\tinyexr-release;$(ProjectDir)\libraries\SDL-release-3.4.0\include;$(ProjectDir)\libraries\cglm-master\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OmitFramePointers>false</OmitFramePointers>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <Optimization>MaxSpeed</Optimization>
+      <LanguageStandard_C>stdc11</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <Profile>true</Profile>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="asset_loader.c" />
     <ClCompile Include="camera.c" />
     <ClCompile Include="camera_space_transform.c" />
+    <ClCompile Include="exr_loader.cpp" />
     <ClCompile Include="graphics_pipeline.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="perlin_noise.c" />
@@ -169,6 +178,7 @@
     <ClInclude Include="asset_loader.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="camera_space_transform.h" />
+    <ClInclude Include="exr_loader.h" />
     <ClInclude Include="fast_obj.h" />
     <ClInclude Include="perlin_noise.h" />
     <ClInclude Include="stb_image.h" />
@@ -184,6 +194,9 @@
   <ItemGroup>
     <ProjectReference Include="libraries\SDL-release-3.4.0\VisualC\SDL\SDL.vcxproj">
       <Project>{81ce8daf-ebb2-4761-8e45-b71abcca8c68}</Project>
+    </ProjectReference>
+    <ProjectReference Include="libraries\tinyexr-release\build\tinyexr.vcxproj">
+      <Project>{8497ad2e-7d20-3923-8881-2e1dce92ddd3}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

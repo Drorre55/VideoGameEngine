@@ -28,6 +28,15 @@
     <Filter Include="Resource Files\tree\textures">
       <UniqueIdentifier>{e1aa2254-e96c-47c2-a123-aa194dd2de9d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Assets">
+      <UniqueIdentifier>{3bf98f1c-2ccc-4ac7-af28-b8654316f8a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Assets\tinyexer">
+      <UniqueIdentifier>{2f7d1385-9716-4ec3-bef8-c40a3782c9e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Asset Loader\tinyexr">
+      <UniqueIdentifier>{ac91f110-9ece-4919-9cb3-96986e4ff880}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -57,9 +66,6 @@
     <ClCompile Include="camera.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="asset_loader.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="visibility_filters.c">
       <Filter>Source Files\Render Pipeline</Filter>
     </ClCompile>
@@ -67,7 +73,13 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="texture.c">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="asset_loader.c">
+      <Filter>Source Files\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="exr_loader.cpp">
+      <Filter>Source Files\Assets\tinyexer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -112,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="stb_image.h">
       <Filter>Header Files\Asset Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="exr_loader.h">
+      <Filter>Header Files\Asset Loader\tinyexr</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

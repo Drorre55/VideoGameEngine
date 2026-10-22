@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 1, 5.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 1, 5.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg", "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_nor_gl_4k.exr");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);
@@ -26,7 +26,7 @@ void _scale_world_objects(WorldObjects* world_objects, float scale) {
     }
 }
 
-WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, float texture_tile_radius, const char* texture_path) {
+WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, float texture_tile_radius, const char* texture_path, const char* normal_path) {
     Uint32 grid_row_count = 2 * radius / triangle_edge_size;
     Uint32 grid_col_count = grid_row_count;
     Uint32 num_triangles_in_row = grid_col_count * 2;
@@ -198,7 +198,7 @@ WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_edge_size, f
     }
 
     obj->texture_bank = texture_bank_create(1);
-    Uint32 terrain_texture_index = texture_bank_add_from_file(&obj->texture_bank, texture_path);
+    Uint32 terrain_texture_index = texture_bank_add_from_file(&obj->texture_bank, texture_path, normal_path);
     for (Uint32 i = 0; i < obj->num_triangles; i++) {
         obj->triangle_texture_indices[i] = terrain_texture_index;
     }

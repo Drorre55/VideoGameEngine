@@ -27,9 +27,8 @@ typedef struct {
 
 WorldObjects* load_world_objects();
 void _scale_world_objects(WorldObjects* world_objects, float scale);
-WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_size, float texture_tile_radius, const char* texture_path);
+WorldObjects* _generate_terrain_mesh(Uint32 radius, Uint32 triangle_size, float texture_tile_radius, const char* texture_path, const char* normal_path);
 static inline void _sum_perlin_octaves(WorldObjects* obj, Uint32 idx, vec2 normalized_point, vec2** octaves_gradients, Uint32 starting_octave_param, Uint8 num_octaves, float multiplier, float normal_divider);
-static inline float _normalize_to_01(float a, float b);
 WorldObjects* _concat_world_objects(WorldObjects** world_objects, Uint8 num_objects);
 void free_world_objects(WorldObjects* world_objects, bool deep_free_textures);
 WorldObjects* world_objects_deep_copy(const WorldObjects* world_objects, bool deep_copy_textures);

@@ -99,7 +99,7 @@ void move_camera_location(ivec3 direction, Camera* camera, float delta_time)
 	global_movement[0] = x_movement[0] + y_movement[0] + z_movement[0];
 	global_movement[1] = x_movement[1] + y_movement[1] + z_movement[1];
 	global_movement[2] = x_movement[2] + y_movement[2] + z_movement[2];
-	glm_normalize(global_movement);
+	glm_vec3_normalize(global_movement);
 
 	static float speed = 30.f;
 	(*camera->global_coords)[0] += global_movement[0] * speed * delta_time;

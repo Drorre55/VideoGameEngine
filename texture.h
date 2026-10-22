@@ -19,15 +19,20 @@ typedef struct {
 } ColorSIMD;
 
 typedef struct {
+    Color color;
+    vec3 normal;
+} Material;
+
+typedef struct {
     Uint32 width;
     Uint32 height;
     Uint32 width_in_tiles;
-    Color* pixels; // Ptr to the contiguous mip-chain memory
+    Material* pixels; // Ptr to the contiguous mip-chain memory
 } Mipmap;
 
 typedef struct {
     Mipmap* mipmaps;
-    Color* contiguous_buffer; // Single allocation for all mips
+    Material* contiguous_buffer; // Single allocation for all mips
     Uint8 num_levels;
 } TiledTexture;
 
@@ -37,7 +42,9 @@ typedef struct {
     Uint32 capacity;
 } TextureBank;
 
-TiledTexture texture_load_from_file(const char* filepath);
+TiledTexture texture_load_from_file(const char* filepath, const char* normal_filepath);
+static TiledTexture _create_tiled_texture(uint32_t width, uint32_t height);
+static void _populate_mipmap(Mipmap mipmap, const Color* colors, const vec3* normals, Uint32 width);
 static void _generate_sub_mipmaps(TiledTexture texture);
 void texture_free(TiledTexture* mipmaps);
 
@@ -46,11 +53,11 @@ void texture_bank_free(TextureBank* bank);
 TiledTexture texture_clone(const TiledTexture src);
 TextureBank texture_bank_deep_copy(const TextureBank* src);
 Uint32 texture_bank_add(TextureBank* bank, TiledTexture mipmaps);
-Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath);
+Uint32 texture_bank_add_from_file(TextureBank* bank, const char* filepath, const char* normal_filepath);
 
 Color texture_sample_nearest(const Mipmap mipmap, float u, float v);
-static inline Color _texture_sample_bilinear(const Mipmap mipmap, float u, float v);
-Color texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy);
+static inline Material _texture_sample_bilinear(const Mipmap mipmap, float u, float v);
+Material texture_sample_trilinear(const TiledTexture texture, float u, float v, vec2 duv_dx, vec2 duv_dy);
 
 Uint32 _clamp_u32(Uint32 value, Uint32 min_value, Uint32 max_value);
 
