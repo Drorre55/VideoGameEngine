@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <CustomBuild Include="C:\DataScience\Git Projects\VideoGameEngine\libraries\tinyexr-release\build\CMakeFiles\b1b79bca0d57040c2d03ab3c48d4956d\generate.stamp.rule">
+    <CustomBuild Include="$(SolutionDir)libraries\tinyexr-release\build\CMakeFiles\b1b79bca0d57040c2d03ab3c48d4956d\generate.stamp.rule">
       <Filter>CMake Rules</Filter>
     </CustomBuild>
   </ItemGroup>

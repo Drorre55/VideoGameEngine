@@ -2,7 +2,7 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>C:\DataScience\Git Projects\VideoGameEngine\libraries\tinyexr-release\build\CMakeFiles\3.31.6-msvc6\CompilerIdC\CompilerIdC.exe</FullPath>
+      <FullPath>$(SolutionDir)libraries\tinyexr-release\build\CMakeFiles\3.31.6-msvc6\CompilerIdC\CompilerIdC.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />

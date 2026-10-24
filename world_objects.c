@@ -9,7 +9,7 @@ WorldObjects* load_world_objects() {
     //WorldObjects* tree = load_obj_file("./Assets/tree/tree1.obj");
     //_scale_world_objects(tree, 0.5);
 
-    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 1, 5.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg", "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_nor_gl_4k.exr");
+    WorldObjects* terrain_mesh = _generate_terrain_mesh(500, 1, 5.f, "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_diff_4k.jpg", "./Assets/forest_ground_06_4k.blend/textures/forest_ground_06_nor_gl_4k_tinyexr_compatible.exr");
     WorldObjects* all_world_objects[2] = { test_scene, terrain_mesh };//, tree };
     
     WorldObjects* world_objects = _concat_world_objects(all_world_objects, 2);

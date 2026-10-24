@@ -62,7 +62,7 @@ TiledTexture texture_load_from_file(const char* color_filepath, const char* norm
     if (normal_filepath) {
         int normal_width, normal_height;
         normals = load_exr_normals(normal_filepath, &normal_width, &normal_height,
-            /*encoded_01=*/0, /*flip_v=*/0);
+            /*encoded_01=*/1, /*flip_v=*/0);
         if (!normals) {
             normals = NULL;
         }
@@ -132,6 +132,7 @@ static void _populate_mipmap(Mipmap mipmap, const Color* colors, const vec3* nor
             // Read linear pixel
             Color pixel_color = colors[row * width + col];
             vec3* pixel_normal = normals[row * width + col];
+            glm_vec3_normalize(pixel_normal);
 
             // Calculate where it belongs in our tiled architecture
             Uint32 tile_row = row >> TILE_WIDTH_BITS;
