@@ -18,7 +18,9 @@ mono_crash.*
 
 # Build results
 [Dd]ebug/
+!**/libraries/**/[Dd]ebug/
 [Dd]ebugPublic/
+!**/libraries/**/[Dd]ebugPublic/
 [Rr]elease/
 !**/libraries/**/[Rr]elease/
 **/libraries/**/*test*
