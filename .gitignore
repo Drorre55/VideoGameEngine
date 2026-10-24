@@ -20,7 +20,11 @@ mono_crash.*
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+!**/libraries/**/[Rr]elease/
+**/libraries/**/*test*
+**/libraries/**/*log*
 [Rr]eleases/
+!**/libraries/**/[Rr]eleases/
 x64/
 x86/
 [Ww][Ii][Nn]32/
