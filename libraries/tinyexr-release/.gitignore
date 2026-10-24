@@ -8,7 +8,7 @@ test/unit/*.exr
 test/unit/*.o
 
 # pure-C11 v3 build outputs
-/build/
+# /build/
 *.obj
 *.exe
 test_tinyexr_v3

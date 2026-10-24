@@ -1,0 +1,5 @@
+C:/DataScience/Git Projects/VideoGameEngine/libraries/tinyexr-release/build/CMakeFiles/miniz.dir
+C:/DataScience/Git Projects/VideoGameEngine/libraries/tinyexr-release/build/CMakeFiles/tinyexr.dir
+C:/DataScience/Git Projects/VideoGameEngine/libraries/tinyexr-release/build/CMakeFiles/test_tinyexr.dir
+C:/DataScience/Git Projects/VideoGameEngine/libraries/tinyexr-release/build/CMakeFiles/ALL_BUILD.dir
+C:/DataScience/Git Projects/VideoGameEngine/libraries/tinyexr-release/build/CMakeFiles/ZERO_CHECK.dir
